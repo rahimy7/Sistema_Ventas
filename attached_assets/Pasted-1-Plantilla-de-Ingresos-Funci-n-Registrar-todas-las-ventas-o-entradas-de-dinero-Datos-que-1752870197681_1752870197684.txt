@@ -1,0 +1,143 @@
+1. 📋 Plantilla de Ingresos
+👉 Función: Registrar todas las ventas o entradas de dinero
+🔑 Datos que debe tener:
+
+Fecha
+
+Cliente (opcional)
+
+Producto o servicio vendido
+
+Cantidad
+
+Precio unitario
+
+Total
+
+Forma de pago (efectivo, transferencia, tarjeta, etc.)
+
+Observaciones
+
+🎯 Resultado esperado: Saber cuánto se vendió por día, por mes, por servicio, y calcular ingresos totales.
+
+2. 💸 Plantilla de Egresos (Gastos)
+👉 Función: Controlar todos los pagos realizados
+🔑 Datos clave:
+
+Fecha
+
+Categoría (Ej: energía, alquiler, transporte, publicidad)
+
+Descripción
+
+Monto
+
+Forma de pago
+
+Comprobante/factura (opcional)
+
+🎯 Resultado esperado: Control de gastos operativos y administrativos, saber en qué se está yendo el dinero.
+
+3. 🛍️ Plantilla de Compras de Mercancía o Insumos
+👉 Función: Llevar registro de todo lo que se compra para revender o usar
+🔑 Datos necesarios:
+
+Fecha
+
+Proveedor
+
+Producto o insumo comprado
+
+Cantidad
+
+Precio unitario
+
+Total
+
+Categoría (gomas, herramientas, aceites, etc.)
+
+🎯 Resultado esperado: Calcular el costo de la mercancía e identificar los proveedores más frecuentes o costosos.
+
+4. 📦 Plantilla de Inventario
+👉 Función: Controlar el stock de productos o materiales
+🔑 Datos recomendados:
+
+Nombre del producto
+
+Medida o presentación
+
+Precio de compra
+
+Precio de venta
+
+Stock inicial
+
+Entradas
+
+Salidas
+
+Stock final
+
+Punto de reposición
+
+🎯 Resultado esperado: Saber cuánto tienes, cuándo reponer, y detectar pérdidas o robos.
+
+5. 👷 Plantilla de Nómina
+👉 Función: Controlar pagos a empleados
+🔑 Información importante:
+
+Nombre del empleado
+
+Cargo
+
+Sueldo mensual
+
+Avances o quincenas
+
+Otros pagos (bono, comisión)
+
+Total pagado
+
+Firma (si es impreso)
+
+🎯 Resultado esperado: Saber cuánto se paga a cada empleado y llevar control legal de sueldos.
+
+6. 📊 Panel General (Dashboard)
+👉 Función: Visualizar de forma rápida el estado financiero del negocio
+🔑 Secciones sugeridas:
+
+Total ingresos vs. egresos mensuales
+
+Gráficas de ventas por servicio/producto
+
+Ganancia neta mensual
+
+Comparativo de meses
+
+🎯 Resultado esperado: Tomar decisiones rápidas con información clara y visual.
+
+7. 📆 Resumen Mensual
+👉 Función: Consolidar todos los datos por mes
+🔑 Columnas clave:
+
+Mes
+
+Total Ingresos
+
+Total Gastos
+
+Total Compras
+
+Ganancia Neta
+
+Observaciones
+
+🎯 Resultado esperado: Ver si el negocio va creciendo, estancado o en pérdida, mes por mes.
+
+🧮 OPCIONAL: Hoja de Impuestos
+👉 Función: Calcular los impuestos a pagar (si estás formalizado)
+
+ITBIS (si vendes productos con impuestos)
+
+ISR (si facturas o declaras)
+
