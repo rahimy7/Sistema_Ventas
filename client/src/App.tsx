@@ -9,6 +9,7 @@ import Dashboard from "@/pages/dashboard-simple";
 import InventoryPage from "@/pages/inventory";
 import SalesPage from "@/pages/sales";
 import PurchasesPage from "@/pages/purchases";
+import ReportsPage from "@/pages/reports";
 import SettingsPage from "@/pages/settings";
 import NotFound from "@/pages/not-found";
 
@@ -20,6 +21,7 @@ function Router() {
         <Route path="/inventario" component={InventoryPage} />
         <Route path="/ventas" component={SalesPage} />
         <Route path="/compras" component={PurchasesPage} />
+        <Route path="/reportes" component={ReportsPage} />
         <Route path="/configuracion" component={SettingsPage} />
         <Route component={NotFound} />
       </Switch>

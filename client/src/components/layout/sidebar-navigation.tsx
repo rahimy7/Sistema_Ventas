@@ -6,6 +6,7 @@ import {
   Package,
   ShoppingCart,
   ShoppingBag,
+  BarChart3,
   Settings,
   Menu,
   X
@@ -21,6 +22,7 @@ const navigationItems = [
   { href: "/inventario", label: "Inventario", icon: Package, color: "text-purple-600" },
   { href: "/ventas", label: "Ventas", icon: ShoppingCart, color: "text-green-600" },
   { href: "/compras", label: "Compras", icon: ShoppingBag, color: "text-orange-600" },
+  { href: "/reportes", label: "Reportes", icon: BarChart3, color: "text-indigo-600" },
   { href: "/configuracion", label: "Configuración", icon: Settings, color: "text-gray-600" },
 ];
 
