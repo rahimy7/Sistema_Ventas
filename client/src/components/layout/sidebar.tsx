@@ -15,7 +15,7 @@ import {
   X
 } from "lucide-react";
 
-type Section = "dashboard" | "income" | "expenses" | "purchases" | "inventory" | "payroll" | "invoices" | "reports";
+type Section = "dashboard" | "income" | "expenses" | "purchases" | "inventory" | "sales" | "payroll" | "invoices" | "reports";
 
 interface SidebarProps {
   activeSection: Section;
@@ -54,6 +54,13 @@ const navigation = [
     icon: Package, 
     color: "text-gray-600",
     path: "/inventario"
+  },
+  { 
+    id: "sales" as Section, 
+    label: "Ventas", 
+    icon: Receipt, 
+    color: "text-green-600",
+    path: "/ventas"
   },
   { 
     id: "payroll" as Section, 

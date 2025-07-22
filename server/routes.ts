@@ -11,6 +11,8 @@ import {
   insertInvoiceSchema,
   insertInvoiceItemSchema,
   insertStockMovementSchema,
+  insertSaleSchema,
+  insertSaleItemSchema,
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -471,6 +473,106 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting invoice:", error);
       res.status(500).json({ message: "Failed to delete invoice" });
+    }
+  });
+
+  // Sales routes
+  app.get("/api/sales", async (req, res) => {
+    try {
+      const sales = await storage.getSales();
+      res.json(sales);
+    } catch (error) {
+      console.error("Error fetching sales:", error);
+      res.status(500).json({ message: "Failed to fetch sales" });
+    }
+  });
+
+  app.get("/api/sales/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const sale = await storage.getSaleById(id);
+      if (!sale) {
+        return res.status(404).json({ message: "Sale not found" });
+      }
+      res.json(sale);
+    } catch (error) {
+      console.error("Error fetching sale:", error);
+      res.status(500).json({ message: "Failed to fetch sale" });
+    }
+  });
+
+  app.get("/api/sales/:id/items", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const items = await storage.getSaleItems(id);
+      res.json(items);
+    } catch (error) {
+      console.error("Error fetching sale items:", error);
+      res.status(500).json({ message: "Failed to fetch sale items" });
+    }
+  });
+
+  app.get("/api/sales/generate-number", async (req, res) => {
+    try {
+      const saleNumber = await storage.generateSaleNumber();
+      res.json({ saleNumber });
+    } catch (error) {
+      console.error("Error generating sale number:", error);
+      res.status(500).json({ message: "Failed to generate sale number" });
+    }
+  });
+
+  app.post("/api/sales", async (req, res) => {
+    try {
+      const { items, ...saleData } = req.body;
+      
+      // Convert saleDate string to Date if necessary
+      if (saleData.saleDate && typeof saleData.saleDate === 'string') {
+        saleData.saleDate = new Date(saleData.saleDate);
+      }
+      
+      // Validate sale data
+      const validatedSale = insertSaleSchema.parse(saleData);
+      
+      // Validate items data
+      const validatedItems = items.map((item: any) => 
+        insertSaleItemSchema.parse(item)
+      );
+
+      const sale = await storage.createSale(validatedSale, validatedItems);
+      res.status(201).json(sale);
+    } catch (error) {
+      console.error("Error creating sale:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create sale" });
+    }
+  });
+
+  app.put("/api/sales/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const data = insertSaleSchema.partial().parse(req.body);
+      const sale = await storage.updateSale(id, data);
+      res.json(sale);
+    } catch (error) {
+      console.error("Error updating sale:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to update sale" });
+    }
+  });
+
+  app.delete("/api/sales/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteSale(id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting sale:", error);
+      res.status(500).json({ message: "Failed to delete sale" });
     }
   });
 

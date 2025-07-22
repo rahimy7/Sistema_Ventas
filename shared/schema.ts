@@ -131,6 +131,39 @@ export const stockMovements = pgTable("stock_movements", {
   createdBy: text("created_by").default("system"),
 });
 
+// Sales table
+export const sales = pgTable("sales", {
+  id: serial("id").primaryKey(),
+  saleNumber: varchar("sale_number", { length: 50 }).notNull().unique(),
+  customerName: text("customer_name").notNull(),
+  customerEmail: varchar("customer_email", { length: 255 }),
+  customerPhone: varchar("customer_phone", { length: 20 }),
+  customerAddress: text("customer_address"),
+  saleDate: timestamp("sale_date").notNull(),
+  subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull(),
+  taxRate: decimal("tax_rate", { precision: 5, scale: 2 }).default("0"),
+  taxAmount: decimal("tax_amount", { precision: 10, scale: 2 }).default("0"),
+  discountAmount: decimal("discount_amount", { precision: 10, scale: 2 }).default("0"),
+  total: decimal("total", { precision: 10, scale: 2 }).notNull(),
+  paymentMethod: varchar("payment_method", { length: 50 }).notNull(), // "cash", "card", "transfer", "credit"
+  status: varchar("status", { length: 20 }).notNull().default("completed"), // "pending", "completed", "cancelled"
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Sale items table
+export const saleItems = pgTable("sale_items", {
+  id: serial("id").primaryKey(),
+  saleId: integer("sale_id").references(() => sales.id, { onDelete: "cascade" }).notNull(),
+  inventoryId: integer("inventory_id").references(() => inventory.id).notNull(),
+  productName: text("product_name").notNull(),
+  quantity: decimal("quantity", { precision: 10, scale: 2 }).notNull(),
+  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
+  subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Relations
 export const employeesRelations = relations(employees, ({ many }) => ({
   payrollRecords: many(payrollRecords),
@@ -161,6 +194,21 @@ export const inventoryRelations = relations(inventory, ({ many }) => ({
 export const stockMovementsRelations = relations(stockMovements, ({ one }) => ({
   inventory: one(inventory, {
     fields: [stockMovements.inventoryId],
+    references: [inventory.id],
+  }),
+}));
+
+export const salesRelations = relations(sales, ({ many }) => ({
+  items: many(saleItems),
+}));
+
+export const saleItemsRelations = relations(saleItems, ({ one }) => ({
+  sale: one(sales, {
+    fields: [saleItems.saleId],
+    references: [sales.id],
+  }),
+  inventory: one(inventory, {
+    fields: [saleItems.inventoryId],
     references: [inventory.id],
   }),
 }));
@@ -214,6 +262,19 @@ export const insertStockMovementSchema = createInsertSchema(stockMovements).omit
   createdAt: true,
 });
 
+export const insertSaleSchema = createInsertSchema(sales).omit({
+  id: true,
+  saleNumber: true, // Se genera automáticamente
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertSaleItemSchema = createInsertSchema(saleItems).omit({
+  id: true,
+  saleId: true, // Se asigna automáticamente
+  createdAt: true,
+});
+
 // Types
 export type Income = typeof incomes.$inferSelect;
 export type InsertIncome = z.infer<typeof insertIncomeSchema>;
@@ -241,6 +302,12 @@ export type InsertInvoiceItem = z.infer<typeof insertInvoiceItemSchema>;
 
 export type StockMovement = typeof stockMovements.$inferSelect;
 export type InsertStockMovement = z.infer<typeof insertStockMovementSchema>;
+
+export type Sale = typeof sales.$inferSelect;
+export type InsertSale = z.infer<typeof insertSaleSchema>;
+
+export type SaleItem = typeof saleItems.$inferSelect;
+export type InsertSaleItem = z.infer<typeof insertSaleItemSchema>;
 
 export type InvoiceWithItems = Invoice & {
   items: InvoiceItem[];

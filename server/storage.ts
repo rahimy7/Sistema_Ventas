@@ -8,6 +8,8 @@ import {
   invoices,
   invoiceItems,
   stockMovements,
+  sales,
+  saleItems,
   type Income,
   type InsertIncome,
   type Expense,
@@ -28,6 +30,10 @@ import {
   type StockMovement,
   type InsertStockMovement,
   type InventoryItemWithMovements,
+  type Sale,
+  type InsertSale,
+  type SaleItem,
+  type InsertSaleItem,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, sum, count, gte, lte, and, like } from "drizzle-orm";
@@ -90,6 +96,15 @@ export interface IStorage {
   updateInvoiceStatus(id: number, status: string): Promise<Invoice>;
   deleteInvoice(id: number): Promise<void>;
   generateInvoiceNumber(): Promise<string>;
+
+  // Sales operations
+  getSales(): Promise<Sale[]>;
+  getSaleById(id: number): Promise<Sale | undefined>;
+  createSale(sale: InsertSale, items: InsertSaleItem[]): Promise<Sale>;
+  updateSale(id: number, sale: Partial<InsertSale>): Promise<Sale>;
+  deleteSale(id: number): Promise<void>;
+  getSaleItems(saleId: number): Promise<SaleItem[]>;
+  generateSaleNumber(): Promise<string>;
 
   // Dashboard analytics
   getDashboardStats(): Promise<{
@@ -407,6 +422,102 @@ export class DatabaseStorage implements IStorage {
     }
 
     return `${year}-${month}-${String(nextNumber).padStart(3, '0')}`;
+  }
+
+  // Sales operations
+  async getSales(): Promise<Sale[]> {
+    return await db.select().from(sales).orderBy(desc(sales.saleDate));
+  }
+
+  async getSaleById(id: number): Promise<Sale | undefined> {
+    const [sale] = await db.select().from(sales).where(eq(sales.id, id));
+    return sale;
+  }
+
+  async createSale(saleData: InsertSale, itemsData: InsertSaleItem[]): Promise<Sale> {
+    // Generate sale number
+    const saleNumber = await this.generateSaleNumber();
+    
+    const [sale] = await db.insert(sales).values({
+      ...saleData,
+      saleNumber
+    }).returning();
+    
+    // Create sale items and adjust inventory
+    for (const itemData of itemsData) {
+      await db.insert(saleItems).values({
+        ...itemData,
+        saleId: sale.id
+      });
+
+      // Adjust inventory stock (decrease)
+      const quantityNum = Number(itemData.quantity);
+      await this.adjustStock(
+        itemData.inventoryId,
+        -quantityNum,
+        "Venta",
+        `Venta #${saleNumber}`
+      );
+    }
+
+    return sale;
+  }
+
+  async updateSale(id: number, saleData: Partial<InsertSale>): Promise<Sale> {
+    const [updatedSale] = await db
+      .update(sales)
+      .set({ ...saleData, updatedAt: new Date() })
+      .where(eq(sales.id, id))
+      .returning();
+    return updatedSale;
+  }
+
+  async deleteSale(id: number): Promise<void> {
+    // Get sale items first to restore inventory
+    const items = await this.getSaleItems(id);
+    const sale = await this.getSaleById(id);
+    
+    if (sale) {
+      // Restore inventory for each item
+      for (const item of items) {
+        const quantityNum = Number(item.quantity);
+        await this.adjustStock(
+          item.inventoryId,
+          quantityNum,
+          "Cancelación de venta",
+          `Cancelación venta #${sale.saleNumber}`
+        );
+      }
+    }
+    
+    // Delete sale items and sale
+    await db.delete(saleItems).where(eq(saleItems.saleId, id));
+    await db.delete(sales).where(eq(sales.id, id));
+  }
+
+  async getSaleItems(saleId: number): Promise<SaleItem[]> {
+    return await db.select().from(saleItems).where(eq(saleItems.saleId, saleId));
+  }
+
+  async generateSaleNumber(): Promise<string> {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    
+    const [lastSale] = await db
+      .select({ saleNumber: sales.saleNumber })
+      .from(sales)
+      .where(like(sales.saleNumber, `V${year}${month}%`))
+      .orderBy(desc(sales.saleNumber))
+      .limit(1);
+
+    let nextNumber = 1;
+    if (lastSale) {
+      const lastNumber = parseInt(lastSale.saleNumber.slice(-4));
+      nextNumber = lastNumber + 1;
+    }
+
+    return `V${year}${month}${String(nextNumber).padStart(4, '0')}`;
   }
 
   // Dashboard analytics
