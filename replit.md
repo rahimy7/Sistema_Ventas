@@ -117,6 +117,9 @@ The system manages seven main entities:
 - ✓ Created dual purchase interface: simple (single product) and enhanced (multiple products)
 - ✓ Added inventory selection with real-time stock display
 - ✓ Implemented automatic price and reorder point configuration
+- ✓ Fixed API call issues using direct fetch instead of apiRequest wrapper
+- ✓ Resolved purchaseItems import error in storage.ts
+- ✓ Both simple and multiple purchase systems working correctly with automatic stock adjustments
 
 ### Chart.js Production Fix (July 2025)
 - ✓ Fixed "line controller not registered" errors in production deployment
