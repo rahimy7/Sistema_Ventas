@@ -13,9 +13,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { generateInvoicePDF, type InvoiceWithItems } from "@/lib/pdf-utils";
-import { insertSaleSchema, type InsertSale, type InventoryItem, type CompanySettings } from "@shared/schema";
-import PDFOptionsDialog from "./pdf-options-dialog";
+import { downloadInvoicePDF } from "@/components/invoice/invoice-pdf";
+import { insertSaleSchema, type InsertSale, type InventoryItem, type CompanySettings, type Sale, type SaleItem } from "@shared/schema";
 import { Plus, Trash2, ShoppingCart, User, CreditCard, Package, Calculator, Search, Check, Printer, FileText } from "lucide-react";
 import { z } from "zod";
 import { useState, useEffect } from "react";
@@ -44,16 +43,15 @@ export default function SaleFormEnhanced({ onSuccess }: SaleFormProps) {
   const [selectedProduct, setSelectedProduct] = useState<InventoryItem | null>(null);
   const [productSearchOpen, setProductSearchOpen] = useState(false);
   const [productSearchValue, setProductSearchValue] = useState("");
-  const [pdfOptionsOpen, setPdfOptionsOpen] = useState(false);
-  const [lastSale, setLastSale] = useState<any>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const form = useForm<SaleFormData>({
     resolver: zodResolver(saleFormSchema),
     defaultValues: {
       customerName: "",
-      customerEmail: "",
-      customerPhone: "",
-      customerAddress: "",
+      customerEmail: null,
+      customerPhone: null,
+      customerAddress: null,
       saleDate: new Date(),
       subtotal: "0",
       taxRate: "16",
@@ -62,7 +60,7 @@ export default function SaleFormEnhanced({ onSuccess }: SaleFormProps) {
       total: "0",
       paymentMethod: "",
       status: "completed",
-      notes: "",
+      notes: null,
       items: [],
     },
   });
@@ -94,7 +92,7 @@ export default function SaleFormEnhanced({ onSuccess }: SaleFormProps) {
       const response = await apiRequest("POST", "/api/sales", { ...saleData, items });
       return response;
     },
-    onSuccess: (sale) => {
+    onSuccess: async (sale) => {
       toast({
         title: "¡Venta registrada!",
         description: "La venta ha sido procesada exitosamente.",
@@ -102,25 +100,15 @@ export default function SaleFormEnhanced({ onSuccess }: SaleFormProps) {
       queryClient.invalidateQueries({ queryKey: ["/api/sales"] });
       queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
       
-      // Guardar los datos de la venta para el diálogo PDF
-      setLastSale({
-        ...sale,
-        items: sale.items?.map((item: any) => ({
-          inventoryId: item.inventoryId,
-          productName: inventory.find(inv => inv.id === item.inventoryId)?.productName || 'Producto',
-          quantity: item.quantity,
-          unitPrice: item.unitPrice,
-          subtotal: parseFloat(item.quantity) * parseFloat(item.unitPrice)
-        })) || []
-      });
+      // Generar factura automáticamente
+      await generateAndDownloadInvoice(sale);
       
       form.reset();
+      setIsProcessing(false);
       onSuccess?.();
-      
-      // Abrir diálogo de opciones PDF
-      setPdfOptionsOpen(true);
     },
     onError: (error: any) => {
+      setIsProcessing(false);
       toast({
         title: "Error",
         description: error?.message || "No se pudo procesar la venta",
@@ -129,60 +117,49 @@ export default function SaleFormEnhanced({ onSuccess }: SaleFormProps) {
     },
   });
 
-  const generateSalePDF = (sale: any) => {
+  const generateAndDownloadInvoice = async (sale: any) => {
     try {
-      const invoice: InvoiceWithItems = {
+      // Primero obtener los items de la venta
+      const saleItems: SaleItem[] = await apiRequest("GET", `/api/sales/${sale.id}/items`);
+
+      // Crear el objeto Sale con los datos correctos
+      const saleData: Sale = {
         id: sale.id,
-        invoiceNumber: sale.saleNumber || `V${Date.now()}`,
+        saleNumber: sale.saleNumber,
         customerName: sale.customerName,
         customerEmail: sale.customerEmail || null,
         customerPhone: sale.customerPhone || null,
         customerAddress: sale.customerAddress || null,
-        issueDate: new Date(sale.saleDate),
-        dueDate: new Date(sale.saleDate),
-        subtotal: sale.subtotal || "0",
-        tax: sale.taxRate || "0",
-        discount: sale.discountAmount || "0",
-        total: sale.total || "0",
-        status: 'paid',
+        saleDate: new Date(sale.saleDate),
+        subtotal: sale.subtotal,
+        taxRate: sale.taxRate,
+        taxAmount: sale.taxAmount,
+        discountAmount: sale.discountAmount,
+        total: sale.total,
+        paymentMethod: sale.paymentMethod,
+        status: sale.status,
         notes: sale.notes || null,
-        items: sale.items?.map((item: any) => ({
-          id: item.inventoryId,
-          description: item.productName,
-          quantity: parseFloat(item.quantity),
-          unitPrice: parseFloat(item.unitPrice),
-          total: parseFloat(item.subtotal)
-        })) || [],
-        createdAt: new Date(),
-        updatedAt: new Date()
+        createdAt: new Date(sale.createdAt || new Date()),
+        updatedAt: new Date(sale.updatedAt || new Date())
       };
 
-      // Usar datos reales de la empresa si están disponibles
-      const companyInfo = companySettings ? {
-        name: companySettings.name,
-        address: companySettings.address,
-        phone: companySettings.phone,
-        email: companySettings.email,
-        website: companySettings.website || undefined
-      } : {
-        name: "AutoParts Pro",
-        address: "Av. Principal #123, Ciudad",
-        phone: "+1234567890",
-        email: "ventas@autoparts.com",
-        website: "www.autoparts.com"
-      };
-
-      generateInvoicePDF({ invoice, companyInfo });
+      // Generar y descargar la factura PDF automáticamente
+      downloadInvoicePDF({
+        sale: saleData,
+        saleItems: saleItems,
+        companyInfo: companySettings || undefined,
+      });
       
       toast({
-        title: "Factura generada",
-        description: "El PDF de la factura se ha descargado automáticamente.",
+        title: "Factura generada automáticamente",
+        description: "El PDF de la factura se ha descargado correctamente.",
       });
     } catch (error) {
-      console.error("Error generando PDF:", error);
+      console.error("Error generando factura:", error);
       toast({
-        title: "Venta procesada",
-        description: "La venta se registró correctamente.",
+        title: "Venta completada",
+        description: "La venta se registró correctamente. Puede generar la factura desde la lista de ventas.",
+        variant: "default",
       });
     }
   };
@@ -241,6 +218,7 @@ export default function SaleFormEnhanced({ onSuccess }: SaleFormProps) {
   }, [fields]);
 
   const onSubmit = (data: SaleFormData) => {
+    setIsProcessing(true);
     createSaleMutation.mutate(data);
   };
 
@@ -279,7 +257,7 @@ export default function SaleFormEnhanced({ onSuccess }: SaleFormProps) {
                     <FormItem>
                       <FormLabel>Email</FormLabel>
                       <FormControl>
-                        <Input type="email" placeholder="correo@ejemplo.com" {...field} />
+                        <Input type="email" placeholder="correo@ejemplo.com" {...field} value={field.value || ""} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -295,7 +273,7 @@ export default function SaleFormEnhanced({ onSuccess }: SaleFormProps) {
                     <FormItem>
                       <FormLabel>Teléfono</FormLabel>
                       <FormControl>
-                        <Input placeholder="+1234567890" {...field} />
+                        <Input placeholder="+1234567890" {...field} value={field.value || ""} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -329,7 +307,7 @@ export default function SaleFormEnhanced({ onSuccess }: SaleFormProps) {
                   <FormItem>
                     <FormLabel>Dirección</FormLabel>
                     <FormControl>
-                      <Textarea placeholder="Dirección completa" {...field} rows={2} />
+                      <Textarea placeholder="Dirección completa" {...field} value={field.value || ""} rows={2} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -568,11 +546,11 @@ export default function SaleFormEnhanced({ onSuccess }: SaleFormProps) {
             </Button>
             <Button
               type="submit"
-              disabled={createSaleMutation.isPending || fields.length === 0}
+              disabled={createSaleMutation.isPending || isProcessing || fields.length === 0}
               className="bg-green-600 hover:bg-green-700 px-8"
             >
-              {createSaleMutation.isPending ? (
-                "Procesando..."
+              {createSaleMutation.isPending || isProcessing ? (
+                createSaleMutation.isPending ? "Procesando venta..." : "Generando factura..."
               ) : (
                 <>
                   <ShoppingCart className="mr-2 h-4 w-4" />
@@ -584,24 +562,7 @@ export default function SaleFormEnhanced({ onSuccess }: SaleFormProps) {
         </form>
       </Form>
 
-      {/* PDF Options Dialog */}
-      {lastSale && (
-        <PDFOptionsDialog
-          open={pdfOptionsOpen}
-          onClose={() => {
-            setPdfOptionsOpen(false);
-            setLastSale(null);
-          }}
-          saleData={lastSale}
-          companyInfo={companySettings ? {
-            name: companySettings.name,
-            address: companySettings.address,
-            phone: companySettings.phone,
-            email: companySettings.email,
-            website: companySettings.website
-          } : undefined}
-        />
-      )}
+
     </div>
   );
 }
