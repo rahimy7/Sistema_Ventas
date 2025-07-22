@@ -75,15 +75,24 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 shadow-lg hover:shadow-xl transition-all duration-300">
+        <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer group">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div className="space-y-2">
                 <p className="text-blue-700 font-medium">Productos en Stock</p>
                 <p className="text-3xl font-bold text-blue-900">156</p>
-                <p className="text-sm text-blue-600">Inventario saludable</p>
+                <div className="flex items-center space-x-2">
+                  <p className="text-sm text-blue-600">Inventario saludable</p>
+                  <Button 
+                    size="sm" 
+                    className="opacity-0 group-hover:opacity-100 transition-opacity bg-blue-600 hover:bg-blue-700 text-xs px-2 py-1 h-6"
+                    onClick={() => window.location.href = '/inventario'}
+                  >
+                    Ver más
+                  </Button>
+                </div>
               </div>
-              <div className="h-14 w-14 bg-blue-500 rounded-2xl flex items-center justify-center">
+              <div className="h-14 w-14 bg-blue-500 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
                 <Package className="h-7 w-7 text-white" />
               </div>
             </div>

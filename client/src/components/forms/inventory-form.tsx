@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { insertInventorySchema, type InsertInventoryItem } from "@shared/schema";
-import { Package, DollarSign, Hash, AlertTriangle } from "lucide-react";
+import { Package, DollarSign, Hash, AlertTriangle, Plus } from "lucide-react";
 
 interface InventoryFormProps {
   onSuccess?: () => void;
@@ -107,9 +107,20 @@ export default function InventoryForm({ onSuccess }: InventoryFormProps) {
                 <Input
                   id="unit"
                   {...form.register("unit")}
-                  placeholder="Ej: litros, unidades, kilos"
+                  placeholder="Ej: litros, unidades, kilos, metros"
                   className="mt-1"
+                  list="unit-suggestions"
                 />
+                <datalist id="unit-suggestions">
+                  <option value="litros" />
+                  <option value="unidades" />
+                  <option value="kilos" />
+                  <option value="metros" />
+                  <option value="pares" />
+                  <option value="juegos" />
+                  <option value="cajas" />
+                  <option value="galones" />
+                </datalist>
                 {form.formState.errors.unit && (
                   <p className="text-sm text-red-600 mt-1">{form.formState.errors.unit.message}</p>
                 )}
@@ -220,21 +231,32 @@ export default function InventoryForm({ onSuccess }: InventoryFormProps) {
       </div>
 
       {/* Botones de Acción */}
-      <div className="flex justify-end space-x-3 pt-6 border-t border-slate-200">
+      <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-3 pt-6 border-t border-slate-200">
         <Button 
           type="button" 
           variant="outline" 
           onClick={() => form.reset()}
-          className="hover:bg-slate-50"
+          className="hover:bg-slate-50 flex items-center justify-center"
         >
-          Limpiar
+          <Package className="h-4 w-4 mr-2" />
+          Limpiar Formulario
         </Button>
         <Button
           type="submit"
           disabled={createInventoryMutation.isPending}
-          className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-lg min-w-[140px]"
+          className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-lg min-w-[160px] flex items-center justify-center"
         >
-          {createInventoryMutation.isPending ? "Guardando..." : "Agregar Producto"}
+          {createInventoryMutation.isPending ? (
+            <>
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+              Guardando...
+            </>
+          ) : (
+            <>
+              <Plus className="h-4 w-4 mr-2" />
+              Agregar Producto
+            </>
+          )}
         </Button>
       </div>
     </form>
