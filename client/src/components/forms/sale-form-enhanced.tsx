@@ -106,6 +106,7 @@ export default function SaleFormEnhanced({ onSuccess }: SaleFormProps) {
       
       // Abrir diálogo de factura automáticamente
       if (sale && sale.id) {
+        console.log("Setting up invoice dialog with sale:", sale);
         const saleData: Sale = {
           id: sale.id,
           saleNumber: sale.saleNumber,
@@ -128,6 +129,34 @@ export default function SaleFormEnhanced({ onSuccess }: SaleFormProps) {
         
         setCompletedSale(saleData);
         setInvoiceDialogOpen(true);
+        console.log("Invoice dialog should open now");
+      } else {
+        console.log("Sale data missing or incomplete:", sale);
+        // If no sale ID, still try to open dialog with form data
+        const formData = form.getValues();
+        const fallbackSale: Sale = {
+          id: Date.now(), // Temporary ID
+          saleNumber: `TEMP-${Date.now()}`,
+          customerName: formData.customerName,
+          customerEmail: formData.customerEmail || null,
+          customerPhone: formData.customerPhone || null,
+          customerAddress: formData.customerAddress || null,
+          saleDate: formData.saleDate || new Date(),
+          subtotal: formData.subtotal,
+          taxRate: formData.taxRate,
+          taxAmount: formData.taxAmount,
+          discountAmount: formData.discountAmount,
+          total: formData.total,
+          paymentMethod: formData.paymentMethod,
+          status: "completed",
+          notes: formData.notes || null,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        };
+        
+        setCompletedSale(fallbackSale);
+        setInvoiceDialogOpen(true);
+        console.log("Opening dialog with fallback data");
       }
       
       form.reset();
