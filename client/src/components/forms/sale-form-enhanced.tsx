@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { downloadInvoicePDF } from "@/components/invoice/invoice-pdf";
 import { insertSaleSchema, type InsertSale, type InventoryItem, type CompanySettings, type Sale, type SaleItem } from "@shared/schema";
+import SaleInvoiceDialog from "@/components/invoice/sale-invoice-dialog";
 import { Plus, Trash2, ShoppingCart, User, CreditCard, Package, Calculator, Search, Check, Printer, FileText } from "lucide-react";
 import { z } from "zod";
 import { useState, useEffect } from "react";
@@ -44,6 +45,8 @@ export default function SaleFormEnhanced({ onSuccess }: SaleFormProps) {
   const [productSearchOpen, setProductSearchOpen] = useState(false);
   const [productSearchValue, setProductSearchValue] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
+  const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
+  const [completedSale, setCompletedSale] = useState<Sale | null>(null);
 
   const form = useForm<SaleFormData>({
     resolver: zodResolver(saleFormSchema),
@@ -93,6 +96,7 @@ export default function SaleFormEnhanced({ onSuccess }: SaleFormProps) {
       return response;
     },
     onSuccess: async (sale) => {
+      console.log("Sale created:", sale); // Debug log
       toast({
         title: "¡Venta registrada!",
         description: "La venta ha sido procesada exitosamente.",
@@ -100,8 +104,31 @@ export default function SaleFormEnhanced({ onSuccess }: SaleFormProps) {
       queryClient.invalidateQueries({ queryKey: ["/api/sales"] });
       queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
       
-      // Generar factura automáticamente
-      await generateAndDownloadInvoice(sale);
+      // Abrir diálogo de factura automáticamente
+      if (sale && sale.id) {
+        const saleData: Sale = {
+          id: sale.id,
+          saleNumber: sale.saleNumber,
+          customerName: sale.customerName,
+          customerEmail: sale.customerEmail || null,
+          customerPhone: sale.customerPhone || null,
+          customerAddress: sale.customerAddress || null,
+          saleDate: new Date(sale.saleDate),
+          subtotal: sale.subtotal,
+          taxRate: sale.taxRate,
+          taxAmount: sale.taxAmount,
+          discountAmount: sale.discountAmount,
+          total: sale.total,
+          paymentMethod: sale.paymentMethod,
+          status: sale.status,
+          notes: sale.notes || null,
+          createdAt: new Date(sale.createdAt || new Date()),
+          updatedAt: new Date(sale.updatedAt || new Date())
+        };
+        
+        setCompletedSale(saleData);
+        setInvoiceDialogOpen(true);
+      }
       
       form.reset();
       setIsProcessing(false);
@@ -117,52 +144,7 @@ export default function SaleFormEnhanced({ onSuccess }: SaleFormProps) {
     },
   });
 
-  const generateAndDownloadInvoice = async (sale: any) => {
-    try {
-      // Primero obtener los items de la venta
-      const saleItems: SaleItem[] = await apiRequest("GET", `/api/sales/${sale.id}/items`);
 
-      // Crear el objeto Sale con los datos correctos
-      const saleData: Sale = {
-        id: sale.id,
-        saleNumber: sale.saleNumber,
-        customerName: sale.customerName,
-        customerEmail: sale.customerEmail || null,
-        customerPhone: sale.customerPhone || null,
-        customerAddress: sale.customerAddress || null,
-        saleDate: new Date(sale.saleDate),
-        subtotal: sale.subtotal,
-        taxRate: sale.taxRate,
-        taxAmount: sale.taxAmount,
-        discountAmount: sale.discountAmount,
-        total: sale.total,
-        paymentMethod: sale.paymentMethod,
-        status: sale.status,
-        notes: sale.notes || null,
-        createdAt: new Date(sale.createdAt || new Date()),
-        updatedAt: new Date(sale.updatedAt || new Date())
-      };
-
-      // Generar y descargar la factura PDF automáticamente
-      downloadInvoicePDF({
-        sale: saleData,
-        saleItems: saleItems,
-        companyInfo: companySettings || undefined,
-      });
-      
-      toast({
-        title: "Factura generada automáticamente",
-        description: "El PDF de la factura se ha descargado correctamente.",
-      });
-    } catch (error) {
-      console.error("Error generando factura:", error);
-      toast({
-        title: "Venta completada",
-        description: "La venta se registró correctamente. Puede generar la factura desde la lista de ventas.",
-        variant: "default",
-      });
-    }
-  };
 
   const addProduct = (product: InventoryItem) => {
     const existingItemIndex = fields.findIndex(item => item.inventoryId === product.id);
@@ -562,7 +544,14 @@ export default function SaleFormEnhanced({ onSuccess }: SaleFormProps) {
         </form>
       </Form>
 
-
+      {/* Invoice Dialog */}
+      {completedSale && (
+        <SaleInvoiceDialog
+          open={invoiceDialogOpen}
+          onOpenChange={setInvoiceDialogOpen}
+          sale={completedSale}
+        />
+      )}
     </div>
   );
 }
