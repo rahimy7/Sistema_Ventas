@@ -80,7 +80,8 @@ const navigation = [
     id: "reports" as Section, 
     label: "Reportes", 
     icon: FileText, 
-    color: "text-gray-600" 
+    color: "text-gray-600",
+    path: "/reportes"
   },
   { 
     id: "settings" as Section, 
