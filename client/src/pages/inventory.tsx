@@ -242,9 +242,9 @@ export default function InventoryPage() {
                               <TableCell className="text-right font-medium">${Number(item.purchasePrice).toLocaleString()}</TableCell>
                               <TableCell className="text-right font-medium">${Number(item.salePrice).toLocaleString()}</TableCell>
                               <TableCell className="text-center font-bold">
-                                <span className={status.color}>{Number(item.currentStock)}</span>
+                                <span className={status.color}>{Number(item.currentStock).toLocaleString()}</span>
                               </TableCell>
-                              <TableCell className="text-center text-slate-600">{Number(item.reorderPoint)}</TableCell>
+                              <TableCell className="text-center text-slate-600">{Number(item.reorderPoint).toLocaleString()}</TableCell>
                               <TableCell className="text-center">
                                 <Badge variant={status.variant} className="inline-flex items-center font-medium">
                                   <StatusIcon className="h-3 w-3 mr-1" />

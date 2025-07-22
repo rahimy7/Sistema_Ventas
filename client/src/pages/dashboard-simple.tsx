@@ -36,7 +36,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-between">
               <div className="space-y-2">
                 <p className="text-emerald-700 font-medium">Ingresos del Mes</p>
-                <p className="text-3xl font-bold text-emerald-900">$25,000</p>
+                <p className="text-3xl font-bold text-emerald-900">${(25000).toLocaleString()}</p>
                 <p className="text-sm text-emerald-600">↗️ +12% vs mes anterior</p>
               </div>
               <div className="h-14 w-14 bg-emerald-500 rounded-2xl flex items-center justify-center">
@@ -51,7 +51,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-between">
               <div className="space-y-2">
                 <p className="text-red-700 font-medium">Gastos del Mes</p>
-                <p className="text-3xl font-bold text-red-900">$15,000</p>
+                <p className="text-3xl font-bold text-red-900">${(15000).toLocaleString()}</p>
                 <p className="text-sm text-red-600">↘️ -5% vs mes anterior</p>
               </div>
               <div className="h-14 w-14 bg-red-500 rounded-2xl flex items-center justify-center">
@@ -81,7 +81,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-between">
               <div className="space-y-2">
                 <p className="text-blue-700 font-medium">Productos en Stock</p>
-                <p className="text-3xl font-bold text-blue-900">156</p>
+                <p className="text-3xl font-bold text-blue-900">{(156).toLocaleString()}</p>
                 <p className="text-sm text-blue-600">Inventario saludable</p>
               </div>
               <div className="h-14 w-14 bg-blue-500 rounded-2xl flex items-center justify-center">

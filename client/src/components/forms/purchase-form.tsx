@@ -351,9 +351,9 @@ export default function PurchaseForm({ purchase, onSuccess, onCancel }: Purchase
 
             <div className="bg-blue-50 p-4 rounded-lg">
               <div className="text-sm text-blue-800">
-                <p><strong>Total a pagar: ${total.toFixed(2)}</strong></p>
+                <p><strong>Total a pagar: ${total.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></p>
                 <p className="text-xs mt-1">
-                  {quantity} {form.watch("unit") || "unidades"} × ${unitPrice.toFixed(2)} = ${total.toFixed(2)}
+                  {Number(quantity).toLocaleString()} {form.watch("unit") || "unidades"} × ${Number(unitPrice).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} = ${total.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </p>
               </div>
             </div>

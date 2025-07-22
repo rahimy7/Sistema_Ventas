@@ -228,7 +228,7 @@ export default function SalesPage() {
 
                       <div className="space-y-1">
                         <p className="text-lg font-bold text-green-600">
-                          ${Number(sale.total).toFixed(2)}
+                          ${Number(sale.total).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </p>
                         <p className="text-xs text-gray-600">Total</p>
                       </div>

@@ -221,7 +221,7 @@ export default function SaleForm({ onSuccess }: SaleFormProps) {
             <SelectContent>
               {inventory.filter(item => Number(item.currentStock) > 0).map((item) => (
                 <SelectItem key={item.id} value={item.id.toString()}>
-                  {item.productName} - Stock: {item.currentStock} - ${item.salePrice}
+                  {item.productName} - Stock: {Number(item.currentStock).toLocaleString()} - ${Number(item.salePrice).toLocaleString()}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -254,10 +254,10 @@ export default function SaleForm({ onSuccess }: SaleFormProps) {
                 />
               </div>
               <div className="w-24 text-right">
-                <span className="text-gray-600">${field.unitPrice}</span>
+                <span className="text-gray-600">${Number(field.unitPrice).toLocaleString()}</span>
               </div>
               <div className="w-24 text-right">
-                <span className="font-medium">${field.subtotal}</span>
+                <span className="font-medium">${Number(field.subtotal).toLocaleString()}</span>
               </div>
               <Button
                 type="button"
@@ -334,19 +334,19 @@ export default function SaleForm({ onSuccess }: SaleFormProps) {
         <div className="bg-white p-4 rounded-lg border space-y-2">
           <div className="flex justify-between">
             <span>Subtotal:</span>
-            <span>${form.watch("subtotal")}</span>
+            <span>${Number(form.watch("subtotal") || 0).toLocaleString()}</span>
           </div>
           <div className="flex justify-between">
             <span>Impuestos:</span>
-            <span>${form.watch("taxAmount")}</span>
+            <span>${Number(form.watch("taxAmount") || 0).toLocaleString()}</span>
           </div>
           <div className="flex justify-between">
             <span>Descuento:</span>
-            <span>-${form.watch("discountAmount")}</span>
+            <span>-${Number(form.watch("discountAmount") || 0).toLocaleString()}</span>
           </div>
           <div className="flex justify-between text-lg font-bold border-t pt-2">
             <span>Total:</span>
-            <span>${form.watch("total")}</span>
+            <span>${Number(form.watch("total") || 0).toLocaleString()}</span>
           </div>
         </div>
 

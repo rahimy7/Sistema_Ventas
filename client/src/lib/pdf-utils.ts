@@ -139,9 +139,9 @@ function generatePDFContent(doc: jsPDF, data: PDFInvoiceData): void {
     
     doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
     doc.text(item.description, 25, currentY + 3);
-    doc.text(item.quantity.toString(), 120, currentY + 3, { align: 'center' });
-    doc.text(`$${item.unitPrice.toLocaleString()}`, 145, currentY + 3, { align: 'center' });
-    doc.text(`$${item.total.toLocaleString()}`, 175, currentY + 3, { align: 'right' });
+    doc.text(Number(item.quantity).toLocaleString(), 120, currentY + 3, { align: 'center' });
+    doc.text(`$${Number(item.unitPrice).toLocaleString()}`, 145, currentY + 3, { align: 'center' });
+    doc.text(`$${Number(item.total).toLocaleString()}`, 175, currentY + 3, { align: 'right' });
     
     currentY += 12;
   });
@@ -156,19 +156,19 @@ function generatePDFContent(doc: jsPDF, data: PDFInvoiceData): void {
   
   // Subtotal
   doc.text('Subtotal:', totalsX, totalsStartY);
-  doc.text(`$${parseFloat(invoice.subtotal).toLocaleString()}`, 175, totalsStartY, { align: 'right' });
+  doc.text(`$${Number(invoice.subtotal).toLocaleString()}`, 175, totalsStartY, { align: 'right' });
   
   // Impuesto
-  if (parseFloat(invoice.tax) > 0) {
-    const taxAmount = (parseFloat(invoice.subtotal) * parseFloat(invoice.tax)) / 100;
+  if (Number(invoice.tax) > 0) {
+    const taxAmount = (Number(invoice.subtotal) * Number(invoice.tax)) / 100;
     doc.text(`Impuesto (${invoice.tax}%):`, totalsX, totalsStartY + 7);
     doc.text(`$${taxAmount.toLocaleString()}`, 175, totalsStartY + 7, { align: 'right' });
   }
   
   // Descuento
-  if (parseFloat(invoice.discount) > 0) {
+  if (Number(invoice.discount) > 0) {
     doc.text('Descuento:', totalsX, totalsStartY + 14);
-    doc.text(`-$${parseFloat(invoice.discount).toLocaleString()}`, 175, totalsStartY + 14, { align: 'right' });
+    doc.text(`-$${Number(invoice.discount).toLocaleString()}`, 175, totalsStartY + 14, { align: 'right' });
   }
   
   // Línea separadora para total
@@ -179,7 +179,7 @@ function generatePDFContent(doc: jsPDF, data: PDFInvoiceData): void {
   doc.setFontSize(12);
   doc.setFont('helvetica', 'bold');
   doc.text('TOTAL:', totalsX, totalsStartY + 30);
-  doc.text(`$${parseFloat(invoice.total).toLocaleString()}`, 175, totalsStartY + 30, { align: 'right' });
+  doc.text(`$${Number(invoice.total).toLocaleString()}`, 175, totalsStartY + 30, { align: 'right' });
   
   // Notas adicionales
   if (invoice.notes) {

@@ -159,7 +159,7 @@ export default function PurchasesPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-gray-900">
-                  {stats.totalPurchases}
+                  {Number(stats.totalPurchases).toLocaleString()}
                 </div>
                 <p className="text-xs text-gray-500 mt-1">
                   Compras registradas
@@ -193,7 +193,7 @@ export default function PurchasesPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-gray-900">
-                  {stats.monthlyPurchases}
+                  {Number(stats.monthlyPurchases).toLocaleString()}
                 </div>
                 <p className="text-xs text-gray-500 mt-1">
                   Este mes
@@ -298,13 +298,13 @@ export default function PurchasesPage() {
                             </TableCell>
                             <TableCell>{purchase.product}</TableCell>
                             <TableCell>
-                              {parseFloat(purchase.quantity)} {purchase.unit}
+                              {Number(purchase.quantity).toLocaleString()} {purchase.unit}
                             </TableCell>
                             <TableCell>
-                              ${parseFloat(purchase.unitPrice).toFixed(2)}
+                              ${Number(purchase.unitPrice).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </TableCell>
                             <TableCell className="font-medium">
-                              ${parseFloat(purchase.totalAmount).toFixed(2)}
+                              ${Number(purchase.totalAmount).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </TableCell>
                             <TableCell>
                               {getPaymentMethodBadge(purchase.paymentMethod)}
