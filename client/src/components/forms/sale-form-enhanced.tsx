@@ -143,13 +143,27 @@ export default function SaleFormEnhanced({ onSuccess }: SaleFormProps) {
         setInvoiceDialogOpen(true);
         console.log("Invoice dialog should open now");
         
+        // Also store form items for backup in case API items fail
+        const formData = form.getValues();
+        const backupItems = formData.items.map((item, index) => ({
+          id: index + 1,
+          saleId: sale.id,
+          inventoryId: item.inventoryId,
+          productName: item.productName,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          subtotal: item.subtotal,
+          createdAt: new Date()
+        }));
+        (window as any).backupSaleItems = backupItems;
+        
         // Form will be reset when dialog closes via event listener
       } else {
         console.log("Sale data missing or incomplete:", sale);
         // If no sale ID, still try to open dialog with form data
         const formData = form.getValues();
         const fallbackSale: Sale = {
-          id: Date.now(), // Temporary ID
+          id: -1, // Use -1 to indicate fallback mode
           saleNumber: `TEMP-${Date.now()}`,
           customerName: formData.customerName,
           customerEmail: formData.customerEmail || null,
@@ -171,6 +185,21 @@ export default function SaleFormEnhanced({ onSuccess }: SaleFormProps) {
         setCompletedSale(fallbackSale);
         setInvoiceDialogOpen(true);
         console.log("Opening dialog with fallback data");
+        
+        // Store fallback sale items for the dialog
+        const fallbackItems = formData.items.map((item, index) => ({
+          id: index + 1,
+          saleId: -1,
+          inventoryId: item.inventoryId,
+          productName: item.productName,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          subtotal: item.subtotal,
+          createdAt: new Date()
+        }));
+        
+        // Store fallback data temporarily for dialog access
+        (window as any).fallbackSaleItems = fallbackItems;
         
         // Form will be reset when dialog closes via event listener
       }

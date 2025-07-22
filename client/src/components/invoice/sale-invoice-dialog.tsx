@@ -22,11 +22,16 @@ export default function SaleInvoiceDialog({
   const [isGenerating, setIsGenerating] = useState(false);
   const { toast } = useToast();
 
-  // Obtener items de la venta
-  const { data: saleItems = [] } = useQuery<SaleItem[]>({
+  // Obtener items de la venta (solo si no es modo fallback)
+  const { data: fetchedSaleItems = [] } = useQuery<SaleItem[]>({
     queryKey: ["/api/sales", sale.id, "items"],
-    enabled: open && !!sale.id,
+    enabled: open && !!sale.id && sale.id > 0, // Solo fetch si no es fallback
   });
+  
+  // Use fallback items if in fallback mode, backup items if fetch failed, otherwise use fetched items
+  const saleItems = sale.id === -1 ? 
+    ((window as any).fallbackSaleItems || []) : 
+    (fetchedSaleItems.length > 0 ? fetchedSaleItems : ((window as any).backupSaleItems || []));
 
   // Obtener configuración de la empresa
   const { data: companySettings } = useQuery<CompanySettings>({
@@ -50,7 +55,7 @@ export default function SaleInvoiceDialog({
         return;
       }
 
-      if (!sale || !sale.id) {
+      if (!sale || (!sale.id && sale.id !== -1)) {
         toast({
           title: "Error",
           description: "Datos de venta incompletos.",
@@ -104,7 +109,7 @@ export default function SaleInvoiceDialog({
         return;
       }
 
-      if (!sale || !sale.id) {
+      if (!sale || (!sale.id && sale.id !== -1)) {
         toast({
           title: "Error",
           description: "Datos de venta incompletos.",
