@@ -75,9 +75,9 @@ export default function SimpleStockAdjustment({ item, onSuccess }: SimpleStockAd
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       {/* Información del producto */}
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <h3 className="font-semibold text-gray-900">{item.productName}</h3>
-        <p className="text-sm text-gray-600">Stock actual: <span className="font-semibold">{currentStock} {item.unit}</span></p>
+      <div className="bg-gradient-to-r from-slate-50 to-slate-100 p-4 rounded-xl border border-slate-200">
+        <h3 className="font-semibold text-slate-900">{item.productName}</h3>
+        <p className="text-sm text-slate-600">Stock actual: <span className="font-semibold text-blue-600">{currentStock} {item.unit}</span></p>
       </div>
 
       {/* Tipo de ajuste */}
@@ -121,22 +121,27 @@ export default function SimpleStockAdjustment({ item, onSuccess }: SimpleStockAd
 
       {/* Vista previa */}
       {quantity && (
-        <div className="bg-blue-50 p-3 rounded-lg">
-          <h4 className="font-medium text-blue-900 mb-2">Vista Previa</h4>
-          <div className="text-sm space-y-1">
-            <div className="flex justify-between">
-              <span>Stock actual:</span>
-              <span className="font-semibold">{currentStock}</span>
+        <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-xl border border-blue-200">
+          <h4 className="font-medium text-blue-900 mb-3 flex items-center">
+            <Package className="h-4 w-4 mr-2" />
+            Vista Previa del Ajuste
+          </h4>
+          <div className="text-sm space-y-2">
+            <div className="flex justify-between items-center py-1">
+              <span className="text-slate-600">Stock actual:</span>
+              <span className="font-semibold text-slate-900">{currentStock}</span>
             </div>
-            <div className="flex justify-between">
-              <span>Cambio:</span>
-              <span className={`font-semibold ${adjustmentType === "increase" ? "text-green-600" : "text-red-600"}`}>
+            <div className="flex justify-between items-center py-1">
+              <span className="text-slate-600">Cambio:</span>
+              <span className={`font-bold ${adjustmentType === "increase" ? "text-emerald-600" : "text-red-600"}`}>
                 {adjustmentType === "increase" ? "+" : "-"}{adjustmentValue}
               </span>
             </div>
-            <div className="flex justify-between">
-              <span>Stock nuevo:</span>
-              <span className="font-semibold text-blue-600">{newStock}</span>
+            <div className="border-t border-blue-200 pt-2">
+              <div className="flex justify-between items-center">
+                <span className="font-medium text-blue-900">Stock nuevo:</span>
+                <span className="font-bold text-blue-700 text-lg">{newStock}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -155,14 +160,23 @@ export default function SimpleStockAdjustment({ item, onSuccess }: SimpleStockAd
       </div>
 
       {/* Botones */}
-      <div className="flex justify-end space-x-2 pt-4">
-        <Button type="button" variant="outline" onClick={onSuccess}>
+      <div className="flex justify-end space-x-3 pt-6 border-t border-slate-200">
+        <Button 
+          type="button" 
+          variant="outline" 
+          onClick={onSuccess}
+          className="hover:bg-slate-50"
+        >
           Cancelar
         </Button>
         <Button 
           type="submit" 
           disabled={adjustStockMutation.isPending || !quantity}
-          className={adjustmentType === "decrease" ? "bg-red-600 hover:bg-red-700" : ""}
+          className={`shadow-lg transition-all duration-200 ${
+            adjustmentType === "decrease" 
+              ? "bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800" 
+              : "bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800"
+          }`}
         >
           {adjustStockMutation.isPending ? "Ajustando..." : "Confirmar Ajuste"}
         </Button>
