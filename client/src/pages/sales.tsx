@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import SaleFormEnhanced from "@/components/forms/sale-form-enhanced";
+import HomeButton from "@/components/ui/home-button";
 import { 
   ShoppingCart, 
   Plus, 
@@ -83,7 +84,9 @@ export default function SalesPage() {
           </h1>
           <p className="text-gray-600 mt-2">Gestiona todas las ventas de tu negocio</p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <div className="flex items-center space-x-3">
+          <HomeButton />
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
             <Button className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 shadow-lg">
               <Plus className="h-4 w-4 mr-2" />
@@ -99,6 +102,7 @@ export default function SalesPage() {
             </div>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       {/* Estadísticas */}

@@ -10,6 +10,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { insertCompanySettingsSchema, type CompanySettings, type InsertCompanySettings } from "@shared/schema";
+import HomeButton from "@/components/ui/home-button";
 import { Settings, Building, Mail, Phone, Globe, FileText, Save } from "lucide-react";
 
 export default function SettingsPage() {
@@ -105,6 +106,7 @@ export default function SettingsPage() {
             </h1>
             <p className="text-gray-600 mt-2">Ajustes generales de la empresa</p>
           </div>
+          <HomeButton />
         </div>
 
         {/* Formulario de configuración */}

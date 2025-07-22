@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import InventoryForm from "@/components/forms/inventory-form";
 import SimpleStockAdjustment from "@/components/forms/simple-stock-adjustment";
+import HomeButton from "@/components/ui/home-button";
 import type { InventoryItem, StockMovement } from "@shared/schema";
 import { format } from "date-fns";
 
@@ -102,6 +103,7 @@ export default function InventoryPage() {
               </div>
             </div>
             <div className="flex items-center space-x-3">
+              <HomeButton />
               <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
                 <DialogTrigger asChild>
                   <Button className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-lg">

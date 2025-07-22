@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import PurchaseForm from "@/components/forms/purchase-form";
+import HomeButton from "@/components/ui/home-button";
 import { Purchase } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -116,8 +117,10 @@ export default function PurchasesPage() {
               Administra las compras a proveedores y controla el inventario
             </p>
           </div>
-          <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-            <DialogTrigger asChild>
+          <div className="flex items-center space-x-3">
+            <HomeButton />
+            <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+              <DialogTrigger asChild>
               <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => setEditingPurchase(null)}>
                 <Plus className="mr-2 h-4 w-4" />
                 Nueva Compra
@@ -140,7 +143,8 @@ export default function PurchasesPage() {
                 onCancel={closeForm}
               />
             </DialogContent>
-          </Dialog>
+            </Dialog>
+          </div>
         </div>
 
         {/* Statistics Cards */}
