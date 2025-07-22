@@ -40,32 +40,24 @@ export const generateInvoicePDF = ({ sale, saleItems, companyInfo }: InvoicePDFP
   // Header section
   let yPosition = margin;
   
-  // Company logo area (placeholder)
-  doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-  doc.rect(margin, yPosition, 40, 30, 'F');
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(16);
-  doc.setFont('helvetica', 'bold');
-  doc.text('LOGO', margin + 20, yPosition + 20, { align: 'center' });
-  
-  // Company information
+  // Company information header (sin logo)
   doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
   doc.setFontSize(18);
   doc.setFont('helvetica', 'bold');
   const companyName = companyInfo?.name || 'Su Empresa';
-  doc.text(companyName, margin + 50, yPosition + 10);
+  doc.text(companyName, margin, yPosition + 10);
   
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
   const companyDetails = [
     companyInfo?.address || 'Dirección de la empresa',
-    companyInfo?.phone || 'Teléfono: +00 000 000 0000',
-    companyInfo?.email || 'email@empresa.com',
-    companyInfo?.website || 'www.empresa.com'
-  ];
+    `Tel: ${companyInfo?.phone || 'N/A'}`,
+    `Email: ${companyInfo?.email || 'N/A'}`,
+    `RNC: ${companyInfo?.taxId || 'N/A'}`
+  ].filter(detail => !detail.includes('N/A')); // Solo mostrar datos disponibles
   
   companyDetails.forEach((detail, index) => {
-    doc.text(detail, margin + 50, yPosition + 20 + (index * 4));
+    doc.text(detail, margin, yPosition + 25 + (index * 5));
   });
   
   yPosition += 50;
@@ -239,7 +231,7 @@ export const generateInvoicePDF = ({ sale, saleItems, companyInfo }: InvoicePDFP
   // Tax
   if (Number(sale.taxAmount) > 0) {
     yPosition += 8;
-    doc.text(`IVA (${Number(sale.taxRate || 0)}%):`, totalsX + 2, yPosition + 5);
+    doc.text(`ITEBIS (${Number(sale.taxRate || 0)}%):`, totalsX + 2, yPosition + 5);
     doc.text(`$${Number(sale.taxAmount || 0).toFixed(2)}`, 
              totalsX + totalsWidth - 2, yPosition + 5, { align: 'right' });
   }

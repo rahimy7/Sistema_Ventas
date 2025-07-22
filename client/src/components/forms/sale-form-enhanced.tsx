@@ -48,18 +48,6 @@ export default function SaleFormEnhanced({ onSuccess }: SaleFormProps) {
   const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
   const [completedSale, setCompletedSale] = useState<Sale | null>(null);
 
-  // Manejar cierre del diálogo de factura
-  useEffect(() => {
-    const handleDialogClosed = () => {
-      console.log("Invoice dialog closed - resetting form");
-      form.reset();
-      onSuccess?.();
-    };
-
-    window.addEventListener('invoiceDialogClosed', handleDialogClosed);
-    return () => window.removeEventListener('invoiceDialogClosed', handleDialogClosed);
-  }, [form, onSuccess]);
-
   const form = useForm<SaleFormData>({
     resolver: zodResolver(saleFormSchema),
     defaultValues: {
@@ -100,6 +88,18 @@ export default function SaleFormEnhanced({ onSuccess }: SaleFormProps) {
     parseFloat(item.currentStock) > 0 &&
     item.productName.toLowerCase().includes(productSearchValue.toLowerCase())
   );
+
+  // Manejar cierre del diálogo de factura
+  useEffect(() => {
+    const handleDialogClosed = () => {
+      console.log("Invoice dialog closed - resetting form");
+      form.reset();
+      onSuccess?.();
+    };
+
+    window.addEventListener('invoiceDialogClosed', handleDialogClosed);
+    return () => window.removeEventListener('invoiceDialogClosed', handleDialogClosed);
+  }, [form, onSuccess]);
 
   const createSaleMutation = useMutation({
     mutationFn: async (data: SaleFormData) => {
