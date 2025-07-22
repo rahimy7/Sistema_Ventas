@@ -7,6 +7,7 @@ import {
   payrollRecords,
   invoices,
   invoiceItems,
+  stockMovements,
   type Income,
   type InsertIncome,
   type Expense,
@@ -24,6 +25,9 @@ import {
   type InvoiceItem,
   type InsertInvoiceItem,
   type InvoiceWithItems,
+  type StockMovement,
+  type InsertStockMovement,
+  type InventoryItemWithMovements,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, sum, count, gte, lte, and, like } from "drizzle-orm";
@@ -58,7 +62,13 @@ export interface IStorage {
   createInventoryItem(item: InsertInventoryItem): Promise<InventoryItem>;
   updateInventoryItem(id: number, item: Partial<InsertInventoryItem>): Promise<InventoryItem>;
   deleteInventoryItem(id: number): Promise<void>;
-  adjustStock(id: number, adjustment: number): Promise<InventoryItem>;
+  adjustStock(id: number, adjustment: number, reason: string, reference?: string): Promise<InventoryItem>;
+  
+  // Stock movement operations
+  getStockMovements(): Promise<StockMovement[]>;
+  getStockMovementsByInventory(inventoryId: number): Promise<StockMovement[]>;
+  createStockMovement(movement: InsertStockMovement): Promise<StockMovement>;
+  getInventoryItemWithMovements(id: number): Promise<InventoryItemWithMovements | undefined>;
 
   // Employee operations
   getEmployees(): Promise<Employee[]>;
@@ -229,11 +239,26 @@ export class DatabaseStorage implements IStorage {
     await db.delete(inventory).where(eq(inventory.id, id));
   }
 
-  async adjustStock(id: number, adjustment: number): Promise<InventoryItem> {
+  async adjustStock(id: number, adjustment: number, reason: string, reference?: string): Promise<InventoryItem> {
     const item = await this.getInventoryItemById(id);
     if (!item) throw new Error("Inventory item not found");
 
-    const newStock = Number(item.currentStock) + adjustment;
+    const previousStock = Number(item.currentStock);
+    const newStock = previousStock + adjustment;
+    
+    // Create stock movement record
+    const movementType = adjustment > 0 ? "in" : adjustment < 0 ? "out" : "adjustment";
+    await db.insert(stockMovements).values({
+      inventoryId: id,
+      movementType,
+      quantity: Math.abs(adjustment).toString(),
+      previousStock: previousStock.toString(),
+      newStock: newStock.toString(),
+      reason,
+      reference,
+      createdBy: "system"
+    });
+
     const [updatedItem] = await db
       .update(inventory)
       .set({ 
@@ -243,6 +268,32 @@ export class DatabaseStorage implements IStorage {
       .where(eq(inventory.id, id))
       .returning();
     return updatedItem;
+  }
+
+  // Stock movement operations
+  async getStockMovements(): Promise<StockMovement[]> {
+    return await db.select().from(stockMovements).orderBy(desc(stockMovements.createdAt));
+  }
+
+  async getStockMovementsByInventory(inventoryId: number): Promise<StockMovement[]> {
+    return await db
+      .select()
+      .from(stockMovements)
+      .where(eq(stockMovements.inventoryId, inventoryId))
+      .orderBy(desc(stockMovements.createdAt));
+  }
+
+  async createStockMovement(movement: InsertStockMovement): Promise<StockMovement> {
+    const [newMovement] = await db.insert(stockMovements).values(movement).returning();
+    return newMovement;
+  }
+
+  async getInventoryItemWithMovements(id: number): Promise<InventoryItemWithMovements | undefined> {
+    const item = await this.getInventoryItemById(id);
+    if (!item) return undefined;
+
+    const movements = await this.getStockMovementsByInventory(id);
+    return { ...item, stockMovements: movements };
   }
 
   // Employee operations

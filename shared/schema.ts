@@ -117,6 +117,20 @@ export const invoiceItems = pgTable("invoice_items", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Stock movements tracking
+export const stockMovements = pgTable("stock_movements", {
+  id: serial("id").primaryKey(),
+  inventoryId: integer("inventory_id").references(() => inventory.id).notNull(),
+  movementType: varchar("movement_type", { length: 20 }).notNull(), // "in", "out", "adjustment"
+  quantity: decimal("quantity", { precision: 10, scale: 2 }).notNull(),
+  previousStock: decimal("previous_stock", { precision: 10, scale: 2 }).notNull(),
+  newStock: decimal("new_stock", { precision: 10, scale: 2 }).notNull(),
+  reason: text("reason").notNull(),
+  reference: text("reference"), // purchase order, sale order, adjustment note
+  createdAt: timestamp("created_at").defaultNow(),
+  createdBy: text("created_by").default("system"),
+});
+
 // Relations
 export const employeesRelations = relations(employees, ({ many }) => ({
   payrollRecords: many(payrollRecords),
@@ -140,6 +154,17 @@ export const invoiceItemsRelations = relations(invoiceItems, ({ one }) => ({
   }),
 }));
 
+export const inventoryRelations = relations(inventory, ({ many }) => ({
+  stockMovements: many(stockMovements),
+}));
+
+export const stockMovementsRelations = relations(stockMovements, ({ one }) => ({
+  inventory: one(inventory, {
+    fields: [stockMovements.inventoryId],
+    references: [inventory.id],
+  }),
+}));
+
 // Insert schemas
 export const insertIncomeSchema = createInsertSchema(incomes).omit({
   id: true,
@@ -158,6 +183,7 @@ export const insertPurchaseSchema = createInsertSchema(purchases).omit({
 
 export const insertInventorySchema = createInsertSchema(inventory).omit({
   id: true,
+  currentStock: true, // currentStock is automatically set to initialStock
   createdAt: true,
   updatedAt: true,
 });
@@ -179,6 +205,11 @@ export const insertInvoiceSchema = createInsertSchema(invoices).omit({
 });
 
 export const insertInvoiceItemSchema = createInsertSchema(invoiceItems).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertStockMovementSchema = createInsertSchema(stockMovements).omit({
   id: true,
   createdAt: true,
 });
@@ -208,6 +239,13 @@ export type InsertInvoice = z.infer<typeof insertInvoiceSchema>;
 export type InvoiceItem = typeof invoiceItems.$inferSelect;
 export type InsertInvoiceItem = z.infer<typeof insertInvoiceItemSchema>;
 
+export type StockMovement = typeof stockMovements.$inferSelect;
+export type InsertStockMovement = z.infer<typeof insertStockMovementSchema>;
+
 export type InvoiceWithItems = Invoice & {
   items: InvoiceItem[];
+};
+
+export type InventoryItemWithMovements = InventoryItem & {
+  stockMovements: StockMovement[];
 };

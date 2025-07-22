@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { 
@@ -26,7 +27,8 @@ const navigation = [
     id: "dashboard" as Section, 
     label: "Dashboard", 
     icon: BarChart3, 
-    color: "text-blue-600" 
+    color: "text-blue-600",
+    path: "/"
   },
   { 
     id: "income" as Section, 
@@ -50,7 +52,8 @@ const navigation = [
     id: "inventory" as Section, 
     label: "Inventario", 
     icon: Package, 
-    color: "text-gray-600" 
+    color: "text-gray-600",
+    path: "/inventario"
   },
   { 
     id: "payroll" as Section, 
@@ -74,6 +77,7 @@ const navigation = [
 
 export default function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [location] = useLocation();
 
   const toggleMobileSidebar = () => {
     setIsMobileOpen(!isMobileOpen);
@@ -132,28 +136,51 @@ export default function Sidebar({ activeSection, onSectionChange }: SidebarProps
           <ul className="space-y-2 px-4">
             {navigation.map((item) => {
               const Icon = item.icon;
-              const isActive = activeSection === item.id;
+              const isActive = item.path ? location === item.path : activeSection === item.id;
               
               return (
                 <li key={item.id}>
-                  <button
-                    onClick={() => handleSectionChange(item.id)}
-                    className={cn(
-                      "w-full flex items-center p-3 rounded-lg transition-colors text-left",
-                      "hover:bg-gray-100",
-                      isActive && "bg-blue-50 text-blue-700"
-                    )}
-                  >
-                    <Icon className={cn(
-                      "w-5 h-5 mr-3",
-                      isActive ? "text-blue-600" : item.color
-                    )} />
-                    <span className={cn(
-                      isActive ? "font-medium" : "font-normal"
-                    )}>
-                      {item.label}
-                    </span>
-                  </button>
+                  {item.path ? (
+                    <Link href={item.path}>
+                      <button
+                        onClick={() => setIsMobileOpen(false)}
+                        className={cn(
+                          "w-full flex items-center p-3 rounded-lg transition-colors text-left",
+                          "hover:bg-gray-100",
+                          isActive && "bg-blue-50 text-blue-700"
+                        )}
+                      >
+                        <Icon className={cn(
+                          "w-5 h-5 mr-3",
+                          isActive ? "text-blue-600" : item.color
+                        )} />
+                        <span className={cn(
+                          isActive ? "font-medium" : "font-normal"
+                        )}>
+                          {item.label}
+                        </span>
+                      </button>
+                    </Link>
+                  ) : (
+                    <button
+                      onClick={() => handleSectionChange(item.id)}
+                      className={cn(
+                        "w-full flex items-center p-3 rounded-lg transition-colors text-left",
+                        "hover:bg-gray-100",
+                        isActive && "bg-blue-50 text-blue-700"
+                      )}
+                    >
+                      <Icon className={cn(
+                        "w-5 h-5 mr-3",
+                        isActive ? "text-blue-600" : item.color
+                      )} />
+                      <span className={cn(
+                        isActive ? "font-medium" : "font-normal"
+                      )}>
+                        {item.label}
+                      </span>
+                    </button>
+                  )}
                 </li>
               );
             })}

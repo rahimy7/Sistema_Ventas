@@ -10,6 +10,7 @@ import {
   insertPayrollRecordSchema,
   insertInvoiceSchema,
   insertInvoiceItemSchema,
+  insertStockMovementSchema,
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -245,12 +246,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/inventory/:id/adjust-stock", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const { adjustment } = req.body;
-      const item = await storage.adjustStock(id, Number(adjustment));
+      const { adjustment, reason, reference } = req.body;
+      const item = await storage.adjustStock(id, Number(adjustment), reason, reference);
       res.json(item);
     } catch (error) {
       console.error("Error adjusting stock:", error);
       res.status(500).json({ message: "Failed to adjust stock" });
+    }
+  });
+
+  // Stock movements routes
+  app.get("/api/stock-movements", async (req, res) => {
+    try {
+      const movements = await storage.getStockMovements();
+      res.json(movements);
+    } catch (error) {
+      console.error("Error fetching stock movements:", error);
+      res.status(500).json({ message: "Failed to fetch stock movements" });
+    }
+  });
+
+  app.get("/api/inventory/:id/movements", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const movements = await storage.getStockMovementsByInventory(id);
+      res.json(movements);
+    } catch (error) {
+      console.error("Error fetching inventory movements:", error);
+      res.status(500).json({ message: "Failed to fetch inventory movements" });
+    }
+  });
+
+  app.get("/api/inventory/:id/with-movements", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const itemWithMovements = await storage.getInventoryItemWithMovements(id);
+      if (!itemWithMovements) {
+        return res.status(404).json({ message: "Inventory item not found" });
+      }
+      res.json(itemWithMovements);
+    } catch (error) {
+      console.error("Error fetching inventory with movements:", error);
+      res.status(500).json({ message: "Failed to fetch inventory with movements" });
     }
   });
 

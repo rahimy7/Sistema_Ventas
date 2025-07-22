@@ -7,6 +7,7 @@ This is a comprehensive business management system built with React, Express.js,
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
+Interface language: Spanish for all user-facing text and forms.
 
 ## System Architecture
 
@@ -16,9 +17,10 @@ Preferred communication style: Simple, everyday language.
 - **UI Library**: Radix UI components with shadcn/ui styling system
 - **Styling**: Tailwind CSS with custom CSS variables for theming
 - **State Management**: TanStack Query (React Query) for server state management
-- **Routing**: Wouter for lightweight client-side routing
+- **Routing**: Wouter for lightweight client-side routing with dedicated pages
 - **Forms**: React Hook Form with Zod validation
 - **Charts**: Chart.js for data visualization
+- **Navigation**: Integrated sidebar with route-based navigation
 
 ### Backend Architecture
 - **Runtime**: Node.js with Express.js framework
@@ -27,30 +29,37 @@ Preferred communication style: Simple, everyday language.
 - **ORM**: Drizzle ORM for type-safe database operations
 - **API Pattern**: RESTful API with JSON responses
 - **Session Management**: Express sessions with PostgreSQL storage
+- **Stock Tracking**: Automated stock movement logging system
 
 ## Key Components
 
 ### Database Schema
-The system manages six main entities:
+The system manages seven main entities:
 - **Incomes**: Revenue tracking with client, product/service, quantity, and payment details
 - **Expenses**: Cost management with categories, descriptions, and payment methods
 - **Purchases**: Supplier purchase tracking with product details and totals
 - **Inventory**: Product catalog with pricing, stock levels, and reorder points
+- **Stock Movements**: Complete audit trail for all inventory changes with reasons and references
 - **Employees**: Staff information with positions and status
 - **Payroll Records**: Employee payment tracking with salaries, advances, and bonuses
 
 ### API Endpoints
 - Dashboard statistics aggregation (`/api/dashboard/stats`)
 - Full CRUD operations for all entities (`/api/[entity]`)
+- Stock management endpoints (`/api/inventory/:id/adjust-stock`)
+- Stock movements tracking (`/api/stock-movements`, `/api/inventory/:id/movements`)
+- Inventory with movement history (`/api/inventory/:id/with-movements`)
 - Specialized queries like expense categories and date-range filtering
 - Real-time data synchronization with React Query
 
 ### UI Components
 - **Dashboard**: KPI cards with trend indicators and interactive charts
+- **Inventory Management**: Complete inventory page with product listing, stock status indicators, and movement history
+- **Stock Adjustment Forms**: Intuitive forms for increasing, decreasing, or setting stock levels with reason tracking
 - **Forms**: Validated input forms for all business operations
 - **Tables**: Data display with sorting, filtering, and export capabilities
 - **Charts**: Revenue/expense trends and categorical breakdowns
-- **Sidebar Navigation**: Section-based routing with visual indicators
+- **Sidebar Navigation**: Route-based navigation with dedicated pages for major features
 
 ## Data Flow
 
@@ -98,4 +107,23 @@ The system manages six main entities:
 - `NODE_ENV`: Environment detection (development/production)
 - Session configuration for authentication persistence
 
-The application follows a standard full-stack architecture with clear separation between client and server concerns, type safety throughout the stack, and modern development practices for maintainability and scalability.
+## Recent Changes (December 2024)
+
+### Inventory Management System Completion
+- ✓ Created complete inventory management page (`/inventario`) with tabbed interface
+- ✓ Implemented stock movements tracking with full audit trail 
+- ✓ Added stock adjustment functionality with reason tracking and previews
+- ✓ Enhanced database schema with `stock_movements` table for inventory history
+- ✓ Integrated route-based navigation in sidebar for dedicated inventory page
+- ✓ Added comprehensive stock status indicators (In Stock, Low Stock, Out of Stock)
+- ✓ Implemented real-time stock statistics and alerts
+- ✓ Created specialized API endpoints for stock adjustments and movement history
+
+### Technical Implementation Details
+- Added `stockMovements` table with movement type, quantities, and audit information
+- Enhanced storage layer with stock movement tracking in all adjustments
+- Created dedicated inventory page with tabbed interface for products and movement history
+- Implemented comprehensive stock adjustment forms with validation and previews
+- Added route-based navigation using Wouter for better user experience
+
+The application follows a standard full-stack architecture with clear separation between client and server concerns, type safety throughout the stack, comprehensive inventory management capabilities, and modern development practices for maintainability and scalability.
