@@ -161,41 +161,61 @@ export const generateInvoicePDF = ({ sale, saleItems, companyInfo }: InvoicePDFP
     ];
   });
   
-  try {
-    console.log("Creating autoTable with data:", { headers, tableData });
-    doc.autoTable({
-      startY: tableStartY,
-      head: headers,
-      body: tableData,
-      theme: 'grid',
-      headStyles: {
-        fillColor: primaryColor,
-        textColor: [255, 255, 255],
-        fontSize: 11,
-        fontStyle: 'bold',
-        halign: 'center'
-      },
-      bodyStyles: {
-        fontSize: 10,
-        textColor: secondaryColor
-      },
-      columnStyles: {
-        0: { cellWidth: 80, halign: 'left' },
-        1: { cellWidth: 30, halign: 'center' },
-        2: { cellWidth: 35, halign: 'right' },
-        3: { cellWidth: 35, halign: 'right' }
-      },
-      margin: { left: margin, right: margin },
-      tableWidth: 'auto'
-    });
-    console.log("autoTable created successfully");
-  } catch (tableError) {
-    console.error("Error creating autoTable:", tableError);
-    throw tableError;
-  }
+  // Create table manually instead of using autoTable
+  const cellHeight = 8;
+  const tableWidth = pageWidth - (margin * 2);
+  const colWidths = [100, 30, 40, 40]; // Adjusted column widths
   
-  // Get Y position after table
-  yPosition = (doc as any).lastAutoTable.finalY + 15;
+  // Table header
+  doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+  doc.rect(margin, tableStartY, tableWidth, cellHeight, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  
+  let xPos = margin + 2;
+  doc.text('Producto/Servicio', xPos, tableStartY + 6);
+  xPos += colWidths[0];
+  doc.text('Cantidad', xPos, tableStartY + 6);
+  xPos += colWidths[1];
+  doc.text('Precio Unit.', xPos, tableStartY + 6);
+  xPos += colWidths[2];
+  doc.text('Subtotal', xPos, tableStartY + 6);
+  
+  yPosition = tableStartY + cellHeight;
+  
+  // Table rows
+  doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  
+  saleItems.forEach((item, index) => {
+    const rowY = yPosition + (index * cellHeight);
+    
+    // Alternate row background
+    if (index % 2 === 1) {
+      doc.setFillColor(248, 250, 252);
+      doc.rect(margin, rowY, tableWidth, cellHeight, 'F');
+    }
+    
+    xPos = margin + 2;
+    doc.text(item.productName || 'Producto', xPos, rowY + 6);
+    xPos += colWidths[0];
+    doc.text(Number(item.quantity || 0).toFixed(2), xPos, rowY + 6);
+    xPos += colWidths[1];
+    doc.text(`$${Number(item.unitPrice || 0).toFixed(2)}`, xPos, rowY + 6);
+    xPos += colWidths[2];
+    doc.text(`$${Number(item.subtotal || 0).toFixed(2)}`, xPos, rowY + 6);
+  });
+  
+  // Table border
+  doc.setDrawColor(200, 200, 200);
+  doc.setLineWidth(0.5);
+  doc.rect(margin, tableStartY, tableWidth, cellHeight + (saleItems.length * cellHeight));
+  
+  yPosition = tableStartY + cellHeight + (saleItems.length * cellHeight) + 15;
+  
+  // Y position is already set after manual table creation
   
   // Totals section
   const totalsX = pageWidth - 80;
