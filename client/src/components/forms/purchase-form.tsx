@@ -184,7 +184,11 @@ export default function PurchaseForm({ purchase, onSuccess, onCancel }: Purchase
                 <FormItem>
                   <FormLabel>Número de Factura</FormLabel>
                   <FormControl>
-                    <Input placeholder="Número de factura o recibo" {...field} />
+                    <Input 
+                      placeholder="Número de factura o recibo" 
+                      {...field}
+                      value={field.value || ""}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -404,6 +408,7 @@ export default function PurchaseForm({ purchase, onSuccess, onCancel }: Purchase
                     <Textarea
                       placeholder="Notas adicionales sobre la compra..."
                       {...field}
+                      value={field.value || ""}
                       rows={3}
                     />
                   </FormControl>

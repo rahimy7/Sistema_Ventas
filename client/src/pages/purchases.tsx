@@ -32,7 +32,7 @@ export default function PurchasesPage() {
   const { toast } = useToast();
 
   // Fetch purchases data
-  const { data: purchases = [], isLoading: purchasesLoading } = useQuery({
+  const { data: purchases = [], isLoading: purchasesLoading } = useQuery<Purchase[]>({
     queryKey: ["/api/purchases"],
   });
 
