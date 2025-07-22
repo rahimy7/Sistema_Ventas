@@ -1,13 +1,5 @@
-import {
-  Chart as ChartJS,
-  ArcElement,
-  Tooltip,
-  Legend,
-} from 'chart.js';
 import { Pie } from 'react-chartjs-2';
 import { type Expense } from '@shared/schema';
-
-ChartJS.register(ArcElement, Tooltip, Legend);
 
 interface ExpenseCategoryChartProps {
   expenses: Expense[];

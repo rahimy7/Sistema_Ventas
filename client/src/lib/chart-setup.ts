@@ -10,19 +10,10 @@ import {
   Title,
   Tooltip,
   Legend,
+  registerables,
 } from 'chart.js';
 
-// Register all Chart.js components globally
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  BarElement,
-  ArcElement,
-  Title,
-  Tooltip,
-  Legend
-);
+// Register ALL Chart.js components globally to prevent "not registered controller" errors
+ChartJS.register(...registerables);
 
 export { ChartJS };

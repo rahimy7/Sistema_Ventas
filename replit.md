@@ -109,6 +109,14 @@ The system manages seven main entities:
 
 ## Recent Changes (January 2025)
 
+### Chart.js Production Fix (July 2025)
+- ✓ Fixed "line controller not registered" errors in production deployment
+- ✓ Standardized all chart components to use react-chartjs-2 exclusively
+- ✓ Created centralized chart setup with registerables for all Chart.js components
+- ✓ Removed conflicting individual Chart.js registrations from components
+- ✓ Implemented global Chart.js configuration in main.tsx entry point
+- ✓ Resolved deployment errors affecting revenue and monthly profitability charts
+
 ### Enhanced Purchase Management System (July 2025)
 - ✓ Improved purchase form to allow selection between existing and new products
 - ✓ Added inventory integration for existing product selection with stock display
