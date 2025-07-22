@@ -10,13 +10,13 @@ import { useToast } from "@/hooks/use-toast";
 
 interface SaleInvoiceDialogProps {
   open: boolean;
-  onClose: () => void;
+  onOpenChange: (open: boolean) => void;
   sale: Sale;
 }
 
 export default function SaleInvoiceDialog({ 
   open, 
-  onClose, 
+  onOpenChange, 
   sale
 }: SaleInvoiceDialogProps) {
   const [isGenerating, setIsGenerating] = useState(false);
@@ -57,7 +57,7 @@ export default function SaleInvoiceDialog({
         description: "Factura descargada correctamente.",
       });
       
-      onClose();
+      onOpenChange(false);
     } catch (error) {
       console.error("Error generating PDF:", error);
       toast({
@@ -93,7 +93,7 @@ export default function SaleInvoiceDialog({
         description: "Factura enviada a imprimir.",
       });
       
-      onClose();
+      onOpenChange(false);
     } catch (error) {
       console.error("Error printing PDF:", error);
       toast({
@@ -107,7 +107,7 @@ export default function SaleInvoiceDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -197,7 +197,7 @@ export default function SaleInvoiceDialog({
 
           {/* Botón cerrar */}
           <div className="flex justify-end pt-4 border-t">
-            <Button variant="ghost" onClick={onClose}>
+            <Button variant="ghost" onClick={() => onOpenChange(false)}>
               <X className="mr-2 h-4 w-4" />
               Cerrar
             </Button>

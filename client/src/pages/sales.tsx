@@ -273,9 +273,9 @@ export default function SalesPage() {
       {saleForInvoice && (
         <SaleInvoiceDialog
           open={invoiceDialogOpen}
-          onClose={() => {
-            setInvoiceDialogOpen(false);
-            setSaleForInvoice(null);
+          onOpenChange={(open) => {
+            setInvoiceDialogOpen(open);
+            if (!open) setSaleForInvoice(null);
           }}
           sale={saleForInvoice}
         />
