@@ -1,12 +1,37 @@
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
-import type { InvoiceWithItems } from '@shared/schema';
 
 // Extender jsPDF para incluir autoTable
 declare module 'jspdf' {
   interface jsPDF {
     autoTable: (options: any) => void;
   }
+}
+
+export interface InvoiceWithItems {
+  id: number;
+  invoiceNumber: string;
+  customerName: string;
+  customerEmail?: string | null;
+  customerPhone?: string | null;
+  customerAddress?: string | null;
+  issueDate: Date;
+  dueDate: Date;
+  subtotal: string;
+  tax: string;
+  discount: string;
+  total: string;
+  status: string;
+  notes?: string | null;
+  items: {
+    id: number;
+    description: string;
+    quantity: number;
+    unitPrice: number;
+    total: number;
+  }[];
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface PDFInvoiceData {
@@ -53,7 +78,9 @@ export function generateInvoicePDF({ invoice, companyInfo }: PDFInvoiceData): vo
   doc.setTextColor(...textColor);
   doc.text(`Factura #: ${invoice.invoiceNumber}`, 150, 35);
   doc.text(`Fecha: ${new Date(invoice.issueDate).toLocaleDateString('es-ES')}`, 150, 42);
-  doc.text(`Vence: ${new Date(invoice.dueDate).toLocaleDateString('es-ES')}`, 150, 49);
+  if (invoice.dueDate) {
+    doc.text(`Vence: ${new Date(invoice.dueDate).toLocaleDateString('es-ES')}`, 150, 49);
+  }
   
   // Estado de la factura
   doc.setFontSize(10);
@@ -85,17 +112,20 @@ export function generateInvoicePDF({ invoice, companyInfo }: PDFInvoiceData): vo
   
   doc.setFontSize(12);
   doc.text(invoice.customerName, 20, 90);
+  let currentY = 97;
   if (invoice.customerEmail) {
-    doc.text(`Email: ${invoice.customerEmail}`, 20, 97);
+    doc.text(`Email: ${invoice.customerEmail}`, 20, currentY);
+    currentY += 7;
   }
   if (invoice.customerPhone) {
-    doc.text(`Tel: ${invoice.customerPhone}`, 20, 104);
+    doc.text(`Tel: ${invoice.customerPhone}`, 20, currentY);
+    currentY += 7;
   }
   if (invoice.customerAddress) {
     // Dividir dirección en múltiples líneas si es muy larga
     const maxWidth = 100;
     const addressLines = doc.splitTextToSize(invoice.customerAddress, maxWidth);
-    doc.text(addressLines, 20, 111);
+    doc.text(addressLines, 20, currentY);
   }
   
   // Tabla de items
@@ -145,19 +175,19 @@ export function generateInvoicePDF({ invoice, companyInfo }: PDFInvoiceData): vo
   
   // Subtotal
   doc.text('Subtotal:', totalsX, totalsStartY);
-  doc.text(`$${parseFloat(invoice.subtotal).toLocaleString()}`, 170, totalsStartY, { align: 'right' });
+  doc.text(`$${parseFloat(invoice.subtotal).toLocaleString()}`, 170, totalsStartY, { align: 'right' } as any);
   
   // Impuesto
   if (parseFloat(invoice.tax) > 0) {
     const taxAmount = (parseFloat(invoice.subtotal) * parseFloat(invoice.tax)) / 100;
     doc.text(`Impuesto (${invoice.tax}%):`, totalsX, totalsStartY + 7);
-    doc.text(`$${taxAmount.toLocaleString()}`, 170, totalsStartY + 7, { align: 'right' });
+    doc.text(`$${taxAmount.toLocaleString()}`, 170, totalsStartY + 7, { align: 'right' } as any);
   }
   
   // Descuento
   if (parseFloat(invoice.discount) > 0) {
     doc.text('Descuento:', totalsX, totalsStartY + 14);
-    doc.text(`-$${parseFloat(invoice.discount).toLocaleString()}`, 170, totalsStartY + 14, { align: 'right' });
+    doc.text(`-$${parseFloat(invoice.discount).toLocaleString()}`, 170, totalsStartY + 14, { align: 'right' } as any);
   }
   
   // Línea separadora para total
@@ -168,7 +198,7 @@ export function generateInvoicePDF({ invoice, companyInfo }: PDFInvoiceData): vo
   doc.setFontSize(12);
   doc.setFont(undefined, 'bold');
   doc.text('TOTAL:', totalsX, totalsStartY + 30);
-  doc.text(`$${parseFloat(invoice.total).toLocaleString()}`, 170, totalsStartY + 30, { align: 'right' });
+  doc.text(`$${parseFloat(invoice.total).toLocaleString()}`, 170, totalsStartY + 30, { align: 'right' } as any);
   
   // Notas adicionales
   if (invoice.notes) {
@@ -195,19 +225,9 @@ export function generateInvoicePDF({ invoice, companyInfo }: PDFInvoiceData): vo
 }
 
 export function printInvoice(invoice: InvoiceWithItems, companyInfo?: PDFInvoiceData['companyInfo']): void {
-  const doc = new jsPDF();
-  
-  // Generar el PDF pero en lugar de descargarlo, abrirlo en nueva ventana para imprimir
-  generateInvoicePDF({ invoice, companyInfo });
-  
-  // Abrir PDF en nueva ventana
-  const pdfBlob = doc.output('blob');
-  const url = URL.createObjectURL(pdfBlob);
-  const printWindow = window.open(url);
-  
-  if (printWindow) {
-    printWindow.onload = () => {
-      printWindow.print();
-    };
+  try {
+    generateInvoicePDF({ invoice, companyInfo });
+  } catch (error) {
+    console.error("Error generating PDF for printing:", error);
   }
 }

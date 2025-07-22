@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import SaleForm from "@/components/forms/sale-form";
+import SaleFormEnhanced from "@/components/forms/sale-form-enhanced";
 import { 
   ShoppingCart, 
   Plus, 
@@ -72,10 +72,11 @@ export default function SalesPage() {
   };
 
   return (
-    <div className="space-y-8 p-6">
-      {/* Encabezado */}
-      <div className="flex justify-between items-center">
-        <div>
+    <div className="min-h-screen bg-gray-50">
+      <div className="space-y-6 p-4">
+        {/* Encabezado */}
+        <div className="flex justify-between items-center">
+          <div>
           <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
             <ShoppingCart className="h-8 w-8 text-green-600" />
             Ventas
@@ -89,11 +90,13 @@ export default function SalesPage() {
               Nueva Venta
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-7xl max-h-screen w-[95vw] h-[95vh] overflow-hidden">
             <DialogHeader>
-              <DialogTitle>Registrar Nueva Venta</DialogTitle>
+              <DialogTitle className="text-xl">Registrar Nueva Venta</DialogTitle>
             </DialogHeader>
-            <SaleForm onSuccess={() => setDialogOpen(false)} />
+            <div className="flex-1 overflow-y-auto">
+              <SaleFormEnhanced onSuccess={() => setDialogOpen(false)} />
+            </div>
           </DialogContent>
         </Dialog>
       </div>
@@ -243,6 +246,7 @@ export default function SalesPage() {
           )}
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }
