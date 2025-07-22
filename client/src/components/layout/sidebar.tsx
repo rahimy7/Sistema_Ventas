@@ -46,7 +46,8 @@ const navigation = [
     id: "purchases" as Section, 
     label: "Compras", 
     icon: ShoppingCart, 
-    color: "text-orange-600" 
+    color: "text-orange-600",
+    path: "/compras"
   },
   { 
     id: "inventory" as Section, 

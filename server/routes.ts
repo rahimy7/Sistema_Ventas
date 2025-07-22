@@ -165,10 +165,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/purchases/stats", async (req, res) => {
+    try {
+      const stats = await storage.getPurchaseStats();
+      res.json(stats);
+    } catch (error) {
+      console.error("Error fetching purchase stats:", error);
+      res.status(500).json({ message: "Failed to fetch purchase statistics" });
+    }
+  });
+
   app.post("/api/purchases", async (req, res) => {
     try {
-      const data = insertPurchaseSchema.parse(req.body);
-      const purchase = await storage.createPurchase(data);
+      const { purchaseDate, ...purchaseData } = req.body;
+      
+      // Convert purchaseDate string to Date if necessary
+      const processedData = {
+        ...purchaseData,
+        purchaseDate: purchaseDate ? new Date(purchaseDate) : new Date(),
+      };
+
+      // Validate purchase data
+      const validatedPurchase = insertPurchaseSchema.parse(processedData);
+      
+      const purchase = await storage.createPurchase(validatedPurchase);
       res.status(201).json(purchase);
     } catch (error) {
       console.error("Error creating purchase:", error);

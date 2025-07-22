@@ -32,14 +32,19 @@ export const expenses = pgTable("expenses", {
 // Purchase tracking
 export const purchases = pgTable("purchases", {
   id: serial("id").primaryKey(),
-  date: timestamp("date").notNull(),
+  purchaseDate: timestamp("purchase_date").notNull(),
   supplier: text("supplier").notNull(),
   product: text("product").notNull(),
+  unit: varchar("unit", { length: 50 }).notNull(),
   quantity: decimal("quantity", { precision: 10, scale: 2 }).notNull(),
   unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
-  total: decimal("total", { precision: 10, scale: 2 }).notNull(),
+  totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull(),
   category: varchar("category", { length: 100 }).notNull(),
+  paymentMethod: varchar("payment_method", { length: 50 }).notNull(),
+  invoiceNumber: varchar("invoice_number", { length: 100 }),
+  notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 // Inventory management

@@ -197,7 +197,7 @@ export class DatabaseStorage implements IStorage {
 
   // Purchase operations
   async getPurchases(): Promise<Purchase[]> {
-    return await db.select().from(purchases).orderBy(desc(purchases.date));
+    return await db.select().from(purchases).orderBy(desc(purchases.purchaseDate));
   }
 
   async getPurchaseById(id: number): Promise<Purchase | undefined> {
@@ -213,7 +213,7 @@ export class DatabaseStorage implements IStorage {
   async updatePurchase(id: number, purchase: Partial<InsertPurchase>): Promise<Purchase> {
     const [updatedPurchase] = await db
       .update(purchases)
-      .set(purchase)
+      .set({ ...purchase, updatedAt: new Date() })
       .where(eq(purchases.id, id))
       .returning();
     return updatedPurchase;
@@ -221,6 +221,44 @@ export class DatabaseStorage implements IStorage {
 
   async deletePurchase(id: number): Promise<void> {
     await db.delete(purchases).where(eq(purchases.id, id));
+  }
+
+  async getPurchaseStats(): Promise<{
+    totalPurchases: number;
+    totalAmount: string;
+    monthlyPurchases: number;
+    monthlyAmount: string;
+  }> {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+    // Total purchases
+    const [totalResult] = await db
+      .select({
+        count: count(),
+        sum: sum(purchases.totalAmount),
+      })
+      .from(purchases);
+
+    // Monthly purchases
+    const [monthlyResult] = await db
+      .select({
+        count: count(),
+        sum: sum(purchases.totalAmount),
+      })
+      .from(purchases)
+      .where(and(
+        gte(purchases.purchaseDate, startOfMonth),
+        lte(purchases.purchaseDate, endOfMonth)
+      ));
+
+    return {
+      totalPurchases: totalResult.count,
+      totalAmount: totalResult.sum || "0",
+      monthlyPurchases: monthlyResult.count,
+      monthlyAmount: monthlyResult.sum || "0",
+    };
   }
 
   // Inventory operations
