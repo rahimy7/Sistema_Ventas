@@ -12,6 +12,8 @@ import {
   X
 } from "lucide-react";
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { type CompanySettings } from "@shared/schema";
 
 interface SidebarNavigationProps {
   className?: string;
@@ -29,6 +31,11 @@ const navigationItems = [
 export default function SidebarNavigation({ className }: SidebarNavigationProps) {
   const [location] = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // Obtener configuración de la empresa
+  const { data: companySettings } = useQuery<CompanySettings>({
+    queryKey: ["/api/company-settings"],
+  });
 
   return (
     <>
@@ -60,7 +67,9 @@ export default function SidebarNavigation({ className }: SidebarNavigationProps)
                 <Package className="h-5 w-5 text-white" />
               </div>
               <div>
-                <h1 className="text-lg font-bold text-gray-900">AutoParts</h1>
+                <h1 className="text-lg font-bold text-gray-900">
+                  {companySettings?.name || 'AutoParts'}
+                </h1>
                 <p className="text-sm text-gray-500">Gestión Empresarial</p>
               </div>
             </div>
