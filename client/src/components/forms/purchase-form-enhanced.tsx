@@ -168,7 +168,18 @@ export default function PurchaseFormEnhanced({ onSuccess, onCancel }: PurchaseFo
         }))
       };
 
-      return apiRequest("/api/purchases/enhanced", "POST", purchaseData);
+      return fetch("/api/purchases/enhanced", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(purchaseData),
+      }).then(res => {
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        return res.json();
+      });
     },
     onSuccess: () => {
       toast({
