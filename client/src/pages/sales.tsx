@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import SaleFormEnhanced from "@/components/forms/sale-form-enhanced";
+import SaleInvoiceDialog from "@/components/invoice/sale-invoice-dialog";
 import HomeButton from "@/components/ui/home-button";
 import { 
   ShoppingCart, 
@@ -17,7 +18,8 @@ import {
   User,
   CreditCard,
   Eye,
-  FileText
+  FileText,
+  Printer
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -26,6 +28,8 @@ import { type Sale } from "@shared/schema";
 export default function SalesPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
+  const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
+  const [saleForInvoice, setSaleForInvoice] = useState<Sale | null>(null);
 
   // Cargar ventas
   const { data: sales = [], isLoading: salesLoading } = useQuery<Sale[]>({
@@ -239,8 +243,21 @@ export default function SalesPage() {
                         variant="outline"
                         size="sm"
                         onClick={() => setSelectedSale(sale)}
+                        title="Ver detalles"
                       >
                         <Eye className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSaleForInvoice(sale);
+                          setInvoiceDialogOpen(true);
+                        }}
+                        title="Imprimir factura"
+                        className="bg-blue-50 hover:bg-blue-100 border-blue-200"
+                      >
+                        <Printer className="h-4 w-4 text-blue-600" />
                       </Button>
                     </div>
                   </div>
@@ -251,6 +268,18 @@ export default function SalesPage() {
         </CardContent>
       </Card>
       </div>
+
+      {/* Invoice Dialog */}
+      {saleForInvoice && (
+        <SaleInvoiceDialog
+          open={invoiceDialogOpen}
+          onClose={() => {
+            setInvoiceDialogOpen(false);
+            setSaleForInvoice(null);
+          }}
+          sale={saleForInvoice}
+        />
+      )}
     </div>
   );
 }
