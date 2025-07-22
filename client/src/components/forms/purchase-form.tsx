@@ -101,21 +101,48 @@ export default function PurchaseForm({ purchase, onSuccess, onCancel }: Purchase
         };
         
         // Create inventory item first
-        await apiRequest("/api/inventory", "POST", inventoryData);
+        const inventoryResponse = await fetch("/api/inventory", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(inventoryData),
+        });
+        
+        if (!inventoryResponse.ok) {
+          throw new Error(`Error creating inventory: ${inventoryResponse.status}`);
+        }
       } else if (!isNewProduct && selectedInventoryItem) {
         // Update existing inventory item's stock
         const adjustment = parseFloat(data.quantity);
-        await apiRequest(`/api/inventory/${selectedInventoryItem.id}/adjust-stock`, "PUT", {
-          adjustment,
-          reason: "Compra",
-          reference: `Compra - ${data.supplier}`,
+        const adjustResponse = await fetch(`/api/inventory/${selectedInventoryItem.id}/adjust-stock`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            adjustment,
+            reason: "Compra",
+            reference: `Compra - ${data.supplier}`,
+          }),
         });
+        
+        if (!adjustResponse.ok) {
+          throw new Error(`Error updating stock: ${adjustResponse.status}`);
+        }
       }
 
       // Then create the purchase record
       const url = purchase ? `/api/purchases/${purchase.id}` : "/api/purchases";
       const method = purchase ? "PUT" : "POST";
-      return apiRequest(url, method, data);
+      
+      const purchaseResponse = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      
+      if (!purchaseResponse.ok) {
+        throw new Error(`Error saving purchase: ${purchaseResponse.status}`);
+      }
+      
+      return purchaseResponse.json();
     },
     onSuccess: () => {
       toast({

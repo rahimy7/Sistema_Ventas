@@ -2,6 +2,7 @@ import {
   incomes,
   expenses,
   purchases,
+  purchaseItems,
   inventory,
   employees,
   payrollRecords,
