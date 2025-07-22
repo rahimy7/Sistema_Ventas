@@ -226,7 +226,21 @@ export function generateInvoicePDF({ invoice, companyInfo }: PDFInvoiceData): vo
 
 export function printInvoice(invoice: InvoiceWithItems, companyInfo?: PDFInvoiceData['companyInfo']): void {
   try {
-    generateInvoicePDF({ invoice, companyInfo });
+    const pdf = new jsPDF();
+    const invoiceData: PDFInvoiceData = { invoice, companyInfo };
+    
+    generatePDFContent(pdf, invoiceData);
+    
+    // Open in new tab for printing
+    const blob = pdf.output('blob');
+    const url = URL.createObjectURL(blob);
+    const printWindow = window.open(url, '_blank');
+    
+    if (printWindow) {
+      printWindow.onload = () => {
+        printWindow.print();
+      };
+    }
   } catch (error) {
     console.error("Error generating PDF for printing:", error);
   }

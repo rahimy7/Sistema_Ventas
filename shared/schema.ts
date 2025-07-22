@@ -280,6 +280,26 @@ export const insertSaleItemSchema = createInsertSchema(saleItems).omit({
   createdAt: true,
 });
 
+// Company settings table
+export const companySettings = pgTable("company_settings", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  address: text("address").notNull(),
+  phone: text("phone").notNull(),
+  email: text("email").notNull(),
+  website: text("website"),
+  taxId: text("tax_id"),
+  logo: text("logo"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertCompanySettingsSchema = createInsertSchema(companySettings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Types
 export type Income = typeof incomes.$inferSelect;
 export type InsertIncome = z.infer<typeof insertIncomeSchema>;
@@ -321,3 +341,6 @@ export type InvoiceWithItems = Invoice & {
 export type InventoryItemWithMovements = InventoryItem & {
   stockMovements: StockMovement[];
 };
+
+export type CompanySettings = typeof companySettings.$inferSelect;
+export type InsertCompanySettings = z.infer<typeof insertCompanySettingsSchema>;

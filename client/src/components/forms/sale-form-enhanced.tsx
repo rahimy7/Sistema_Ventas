@@ -14,7 +14,8 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { generateInvoicePDF, type InvoiceWithItems } from "@/lib/pdf-utils";
-import { insertSaleSchema, type InsertSale, type InventoryItem } from "@shared/schema";
+import { insertSaleSchema, type InsertSale, type InventoryItem, type CompanySettings } from "@shared/schema";
+import PDFOptionsDialog from "./pdf-options-dialog";
 import { Plus, Trash2, ShoppingCart, User, CreditCard, Package, Calculator, Search, Check, Printer, FileText } from "lucide-react";
 import { z } from "zod";
 import { useState, useEffect } from "react";
@@ -43,6 +44,8 @@ export default function SaleFormEnhanced({ onSuccess }: SaleFormProps) {
   const [selectedProduct, setSelectedProduct] = useState<InventoryItem | null>(null);
   const [productSearchOpen, setProductSearchOpen] = useState(false);
   const [productSearchValue, setProductSearchValue] = useState("");
+  const [pdfOptionsOpen, setPdfOptionsOpen] = useState(false);
+  const [lastSale, setLastSale] = useState<any>(null);
 
   const form = useForm<SaleFormData>({
     resolver: zodResolver(saleFormSchema),
@@ -74,6 +77,11 @@ export default function SaleFormEnhanced({ onSuccess }: SaleFormProps) {
     queryKey: ["/api/inventory"],
   });
 
+  // Obtener configuración de la empresa
+  const { data: companySettings } = useQuery<CompanySettings>({
+    queryKey: ["/api/company-settings"],
+  });
+
   // Filtrar productos disponibles (con stock > 0)
   const availableProducts = inventory.filter(item => 
     parseFloat(item.currentStock) > 0 &&
@@ -93,11 +101,24 @@ export default function SaleFormEnhanced({ onSuccess }: SaleFormProps) {
       });
       queryClient.invalidateQueries({ queryKey: ["/api/sales"] });
       queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
+      
+      // Guardar los datos de la venta para el diálogo PDF
+      setLastSale({
+        ...sale,
+        items: sale.items?.map((item: any) => ({
+          inventoryId: item.inventoryId,
+          productName: inventory.find(inv => inv.id === item.inventoryId)?.productName || 'Producto',
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          subtotal: parseFloat(item.quantity) * parseFloat(item.unitPrice)
+        })) || []
+      });
+      
       form.reset();
       onSuccess?.();
       
-      // Generar PDF automáticamente
-      generateSalePDF(sale);
+      // Abrir diálogo de opciones PDF
+      setPdfOptionsOpen(true);
     },
     onError: (error: any) => {
       toast({
@@ -136,7 +157,14 @@ export default function SaleFormEnhanced({ onSuccess }: SaleFormProps) {
         updatedAt: new Date()
       };
 
-      const companyInfo = {
+      // Usar datos reales de la empresa si están disponibles
+      const companyInfo = companySettings ? {
+        name: companySettings.name,
+        address: companySettings.address,
+        phone: companySettings.phone,
+        email: companySettings.email,
+        website: companySettings.website || undefined
+      } : {
         name: "AutoParts Pro",
         address: "Av. Principal #123, Ciudad",
         phone: "+1234567890",
@@ -555,6 +583,25 @@ export default function SaleFormEnhanced({ onSuccess }: SaleFormProps) {
           </div>
         </form>
       </Form>
+
+      {/* PDF Options Dialog */}
+      {lastSale && (
+        <PDFOptionsDialog
+          open={pdfOptionsOpen}
+          onClose={() => {
+            setPdfOptionsOpen(false);
+            setLastSale(null);
+          }}
+          saleData={lastSale}
+          companyInfo={companySettings ? {
+            name: companySettings.name,
+            address: companySettings.address,
+            phone: companySettings.phone,
+            email: companySettings.email,
+            website: companySettings.website
+          } : undefined}
+        />
+      )}
     </div>
   );
 }

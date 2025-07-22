@@ -10,6 +10,7 @@ import {
   stockMovements,
   sales,
   saleItems,
+  companySettings,
   type Income,
   type InsertIncome,
   type Expense,
@@ -34,6 +35,8 @@ import {
   type InsertSale,
   type SaleItem,
   type InsertSaleItem,
+  type CompanySettings,
+  type InsertCompanySettings,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, sum, count, gte, lte, and, like } from "drizzle-orm";
@@ -104,6 +107,11 @@ export interface IStorage {
   updateSale(id: number, sale: Partial<InsertSale>): Promise<Sale>;
   deleteSale(id: number): Promise<void>;
   getSaleItems(saleId: number): Promise<SaleItem[]>;
+
+  // Company settings operations
+  getCompanySettings(): Promise<CompanySettings | undefined>;
+  createCompanySettings(settings: InsertCompanySettings): Promise<CompanySettings>;
+  updateCompanySettings(id: number, settings: Partial<InsertCompanySettings>): Promise<CompanySettings>;
   generateSaleNumber(): Promise<string>;
 
   // Dashboard analytics
@@ -618,6 +626,26 @@ export class DatabaseStorage implements IStorage {
       totalInvoices: invoicesResult[0]?.count || 0,
       pendingInvoices: pendingInvoicesResult[0]?.count || 0,
     };
+  }
+
+  // Company settings operations
+  async getCompanySettings(): Promise<CompanySettings | undefined> {
+    const [settings] = await db.select().from(companySettings).limit(1);
+    return settings;
+  }
+
+  async createCompanySettings(settings: InsertCompanySettings): Promise<CompanySettings> {
+    const [newSettings] = await db.insert(companySettings).values(settings).returning();
+    return newSettings;
+  }
+
+  async updateCompanySettings(id: number, settings: Partial<InsertCompanySettings>): Promise<CompanySettings> {
+    const [updatedSettings] = await db
+      .update(companySettings)
+      .set({ ...settings, updatedAt: new Date() })
+      .where(eq(companySettings.id, id))
+      .returning();
+    return updatedSettings;
   }
 }
 

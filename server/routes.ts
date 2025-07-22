@@ -13,6 +13,7 @@ import {
   insertStockMovementSchema,
   insertSaleSchema,
   insertSaleItemSchema,
+  insertCompanySettingsSchema,
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -593,6 +594,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting sale:", error);
       res.status(500).json({ message: "Failed to delete sale" });
+    }
+  });
+
+  // Company settings routes
+  app.get("/api/company-settings", async (req, res) => {
+    try {
+      const settings = await storage.getCompanySettings();
+      res.json(settings);
+    } catch (error) {
+      console.error("Error fetching company settings:", error);
+      res.status(500).json({ message: "Failed to fetch company settings" });
+    }
+  });
+
+  app.post("/api/company-settings", async (req, res) => {
+    try {
+      const data = insertCompanySettingsSchema.parse(req.body);
+      const settings = await storage.createCompanySettings(data);
+      res.status(201).json(settings);
+    } catch (error) {
+      console.error("Error creating company settings:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create company settings" });
+    }
+  });
+
+  app.put("/api/company-settings/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const data = insertCompanySettingsSchema.partial().parse(req.body);
+      const settings = await storage.updateCompanySettings(id, data);
+      res.json(settings);
+    } catch (error) {
+      console.error("Error updating company settings:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to update company settings" });
     }
   });
 

@@ -12,10 +12,11 @@ import {
   FileText,
   Receipt,
   Menu,
-  X
+  X,
+  Settings
 } from "lucide-react";
 
-type Section = "dashboard" | "income" | "expenses" | "purchases" | "inventory" | "sales" | "payroll" | "invoices" | "reports";
+type Section = "dashboard" | "income" | "expenses" | "purchases" | "inventory" | "sales" | "payroll" | "invoices" | "reports" | "settings";
 
 interface SidebarProps {
   activeSection: Section;
@@ -80,6 +81,13 @@ const navigation = [
     label: "Reportes", 
     icon: FileText, 
     color: "text-gray-600" 
+  },
+  { 
+    id: "settings" as Section, 
+    label: "Configuración", 
+    icon: Settings, 
+    color: "text-purple-600",
+    path: "/configuracion"
   },
 ];
 
