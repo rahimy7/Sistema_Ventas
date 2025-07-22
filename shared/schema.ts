@@ -29,22 +29,31 @@ export const expenses = pgTable("expenses", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Purchase tracking
+// Purchase tracking (header)
 export const purchases = pgTable("purchases", {
   id: serial("id").primaryKey(),
   purchaseDate: timestamp("purchase_date").notNull(),
   supplier: text("supplier").notNull(),
+  totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull(),
+  paymentMethod: varchar("payment_method", { length: 50 }).notNull(),
+  invoiceNumber: varchar("invoice_number", { length: 100 }),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Purchase items (details)
+export const purchaseItems = pgTable("purchase_items", {
+  id: serial("id").primaryKey(),
+  purchaseId: integer("purchase_id").references(() => purchases.id).notNull(),
   product: text("product").notNull(),
   unit: varchar("unit", { length: 50 }).notNull(),
   quantity: decimal("quantity", { precision: 10, scale: 2 }).notNull(),
   unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
   totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull(),
   category: varchar("category", { length: 100 }).notNull(),
-  paymentMethod: varchar("payment_method", { length: 50 }).notNull(),
-  invoiceNumber: varchar("invoice_number", { length: 100 }),
-  notes: text("notes"),
+  inventoryId: integer("inventory_id").references(() => inventory.id), // Link to inventory if existing product
   createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 // Inventory management
