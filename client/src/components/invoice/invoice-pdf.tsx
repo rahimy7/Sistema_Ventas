@@ -151,38 +151,48 @@ export const generateInvoicePDF = ({ sale, saleItems, companyInfo }: InvoicePDFP
   const headers = [['Producto/Servicio', 'Cantidad', 'Precio Unit.', 'Subtotal']];
   
   // Table data
-  const tableData = saleItems.map(item => [
-    item.productName,
-    Number(item.quantity).toLocaleString('es-ES', { minimumFractionDigits: 2 }),
-    `$${Number(item.unitPrice).toLocaleString('es-ES', { minimumFractionDigits: 2 })}`,
-    `$${Number(item.subtotal).toLocaleString('es-ES', { minimumFractionDigits: 2 })}`
-  ]);
-  
-  doc.autoTable({
-    startY: tableStartY,
-    head: headers,
-    body: tableData,
-    theme: 'grid',
-    headStyles: {
-      fillColor: primaryColor,
-      textColor: [255, 255, 255],
-      fontSize: 11,
-      fontStyle: 'bold',
-      halign: 'center'
-    },
-    bodyStyles: {
-      fontSize: 10,
-      textColor: secondaryColor
-    },
-    columnStyles: {
-      0: { cellWidth: 80, halign: 'left' },
-      1: { cellWidth: 30, halign: 'center' },
-      2: { cellWidth: 35, halign: 'right' },
-      3: { cellWidth: 35, halign: 'right' }
-    },
-    margin: { left: margin, right: margin },
-    tableWidth: 'auto'
+  const tableData = saleItems.map(item => {
+    console.log("Processing item:", item);
+    return [
+      item.productName || 'Producto',
+      Number(item.quantity || 0).toFixed(2),
+      `$${Number(item.unitPrice || 0).toFixed(2)}`,
+      `$${Number(item.subtotal || 0).toFixed(2)}`
+    ];
   });
+  
+  try {
+    console.log("Creating autoTable with data:", { headers, tableData });
+    doc.autoTable({
+      startY: tableStartY,
+      head: headers,
+      body: tableData,
+      theme: 'grid',
+      headStyles: {
+        fillColor: primaryColor,
+        textColor: [255, 255, 255],
+        fontSize: 11,
+        fontStyle: 'bold',
+        halign: 'center'
+      },
+      bodyStyles: {
+        fontSize: 10,
+        textColor: secondaryColor
+      },
+      columnStyles: {
+        0: { cellWidth: 80, halign: 'left' },
+        1: { cellWidth: 30, halign: 'center' },
+        2: { cellWidth: 35, halign: 'right' },
+        3: { cellWidth: 35, halign: 'right' }
+      },
+      margin: { left: margin, right: margin },
+      tableWidth: 'auto'
+    });
+    console.log("autoTable created successfully");
+  } catch (tableError) {
+    console.error("Error creating autoTable:", tableError);
+    throw tableError;
+  }
   
   // Get Y position after table
   yPosition = (doc as any).lastAutoTable.finalY + 15;
@@ -203,14 +213,14 @@ export const generateInvoicePDF = ({ sale, saleItems, companyInfo }: InvoicePDFP
   
   // Subtotal
   doc.text('Subtotal:', totalsX + 2, yPosition + 5);
-  doc.text(`$${Number(sale.subtotal).toLocaleString('es-ES', { minimumFractionDigits: 2 })}`, 
+  doc.text(`$${Number(sale.subtotal || 0).toFixed(2)}`, 
            totalsX + totalsWidth - 2, yPosition + 5, { align: 'right' });
   
   // Tax
   if (Number(sale.taxAmount) > 0) {
     yPosition += 8;
-    doc.text(`IVA (${Number(sale.taxRate)}%):`, totalsX + 2, yPosition + 5);
-    doc.text(`$${Number(sale.taxAmount).toLocaleString('es-ES', { minimumFractionDigits: 2 })}`, 
+    doc.text(`IVA (${Number(sale.taxRate || 0)}%):`, totalsX + 2, yPosition + 5);
+    doc.text(`$${Number(sale.taxAmount || 0).toFixed(2)}`, 
              totalsX + totalsWidth - 2, yPosition + 5, { align: 'right' });
   }
   
@@ -218,7 +228,7 @@ export const generateInvoicePDF = ({ sale, saleItems, companyInfo }: InvoicePDFP
   if (Number(sale.discountAmount) > 0) {
     yPosition += 8;
     doc.text('Descuento:', totalsX + 2, yPosition + 5);
-    doc.text(`-$${Number(sale.discountAmount).toLocaleString('es-ES', { minimumFractionDigits: 2 })}`, 
+    doc.text(`-$${Number(sale.discountAmount || 0).toFixed(2)}`, 
              totalsX + totalsWidth - 2, yPosition + 5, { align: 'right' });
   }
   
@@ -234,7 +244,7 @@ export const generateInvoicePDF = ({ sale, saleItems, companyInfo }: InvoicePDFP
   doc.setFontSize(12);
   doc.setTextColor(accentColor[0], accentColor[1], accentColor[2]);
   doc.text('TOTAL:', totalsX + 2, yPosition + 5);
-  doc.text(`$${Number(sale.total).toLocaleString('es-ES', { minimumFractionDigits: 2 })}`, 
+  doc.text(`$${Number(sale.total || 0).toFixed(2)}`, 
            totalsX + totalsWidth - 2, yPosition + 5, { align: 'right' });
   
   yPosition += 20;
