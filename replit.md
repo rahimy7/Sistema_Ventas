@@ -109,6 +109,15 @@ The system manages seven main entities:
 
 ## Recent Changes (January 2025)
 
+### Multi-Product Purchase System (July 2025)
+- ✓ Created enhanced purchase form supporting multiple products in single transaction
+- ✓ Implemented purchase header and items structure with database transactions
+- ✓ Added automatic inventory management for new and existing products
+- ✓ Integrated stock movement tracking for all purchase operations
+- ✓ Created dual purchase interface: simple (single product) and enhanced (multiple products)
+- ✓ Added inventory selection with real-time stock display
+- ✓ Implemented automatic price and reorder point configuration
+
 ### Chart.js Production Fix (July 2025)
 - ✓ Fixed "line controller not registered" errors in production deployment
 - ✓ Standardized all chart components to use react-chartjs-2 exclusively

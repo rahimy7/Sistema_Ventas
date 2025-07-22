@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import PurchaseForm from "@/components/forms/purchase-form";
+import PurchaseFormEnhanced from "@/components/forms/purchase-form-enhanced";
 import HomeButton from "@/components/ui/home-button";
 import { Purchase } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
@@ -27,6 +28,7 @@ interface PurchaseStats {
 export default function PurchasesPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isEnhancedFormOpen, setIsEnhancedFormOpen] = useState(false);
   const [editingPurchase, setEditingPurchase] = useState<Purchase | null>(null);
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -82,6 +84,10 @@ export default function PurchasesPage() {
     setEditingPurchase(null);
   };
 
+  const closeEnhancedForm = () => {
+    setIsEnhancedFormOpen(false);
+  };
+
   const getPaymentMethodBadge = (method: string) => {
     const variants: Record<string, "default" | "secondary" | "outline"> = {
       cash: "default",
@@ -119,22 +125,46 @@ export default function PurchasesPage() {
           </div>
           <div className="flex items-center space-x-3">
             <HomeButton />
+            
+            {/* Enhanced Purchase Form */}
+            <Dialog open={isEnhancedFormOpen} onOpenChange={setIsEnhancedFormOpen}>
+              <DialogTrigger asChild>
+                <Button className="bg-green-600 hover:bg-green-700">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Compra Múltiple
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Nueva Compra - Múltiples Productos</DialogTitle>
+                  <DialogDescription>
+                    Registra una compra con varios productos en una sola transacción.
+                  </DialogDescription>
+                </DialogHeader>
+                <PurchaseFormEnhanced
+                  onSuccess={closeEnhancedForm}
+                  onCancel={closeEnhancedForm}
+                />
+              </DialogContent>
+            </Dialog>
+
+            {/* Simple Purchase Form */}
             <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
               <DialogTrigger asChild>
               <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => setEditingPurchase(null)}>
                 <Plus className="mr-2 h-4 w-4" />
-                Nueva Compra
+                Compra Simple
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>
-                  {editingPurchase ? "Editar Compra" : "Nueva Compra"}
+                  {editingPurchase ? "Editar Compra" : "Nueva Compra Simple"}
                 </DialogTitle>
                 <DialogDescription>
                   {editingPurchase
                     ? "Modifica los datos de la compra."
-                    : "Registra una nueva compra de productos o servicios."}
+                    : "Registra una compra de un solo producto."}
                 </DialogDescription>
               </DialogHeader>
               <PurchaseForm

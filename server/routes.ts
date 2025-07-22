@@ -231,6 +231,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Enhanced purchase endpoint for multiple items
+  app.post("/api/purchases/enhanced", async (req, res) => {
+    try {
+      const { purchaseDate, ...purchaseData } = req.body;
+      
+      // Convert purchaseDate string to Date if necessary
+      const processedData = {
+        ...purchaseData,
+        purchaseDate: purchaseDate ? new Date(purchaseDate) : new Date(),
+      };
+
+      const purchase = await storage.createEnhancedPurchase(processedData);
+      res.status(201).json(purchase);
+    } catch (error) {
+      console.error("Error creating enhanced purchase:", error);
+      res.status(500).json({ message: "Failed to create enhanced purchase" });
+    }
+  });
+
   // Inventory routes
   app.get("/api/inventory", async (req, res) => {
     try {

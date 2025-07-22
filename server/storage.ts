@@ -218,6 +218,112 @@ export class DatabaseStorage implements IStorage {
     return newPurchase;
   }
 
+  // Enhanced purchase creation with multiple items
+  async createEnhancedPurchase(purchaseData: {
+    purchaseDate: Date;
+    supplier: string;
+    totalAmount: string;
+    paymentMethod: string;
+    invoiceNumber?: string;
+    notes?: string;
+    items: Array<{
+      product: string;
+      unit: string;
+      quantity: string;
+      unitPrice: string;
+      totalAmount: string;
+      category: string;
+      inventoryId?: number;
+      isNewProduct: boolean;
+      salePrice?: string;
+      reorderPoint?: string;
+    }>;
+  }): Promise<Purchase> {
+    return await db.transaction(async (tx) => {
+      // Create the purchase header
+      const [purchase] = await tx.insert(purchases).values({
+        purchaseDate: purchaseData.purchaseDate,
+        supplier: purchaseData.supplier,
+        totalAmount: purchaseData.totalAmount,
+        paymentMethod: purchaseData.paymentMethod,
+        invoiceNumber: purchaseData.invoiceNumber,
+        notes: purchaseData.notes,
+      }).returning();
+
+      // Process each item
+      for (const item of purchaseData.items) {
+        let inventoryId = item.inventoryId;
+
+        // If it's a new product, create inventory entry
+        if (item.isNewProduct) {
+          const [newInventoryItem] = await tx.insert(inventory).values({
+            productName: item.product,
+            unit: item.unit,
+            purchasePrice: item.unitPrice,
+            salePrice: item.salePrice || item.unitPrice,
+            initialStock: item.quantity,
+            currentStock: item.quantity,
+            reorderPoint: item.reorderPoint || "0",
+          }).returning();
+          inventoryId = newInventoryItem.id;
+
+          // Log initial stock movement
+          await tx.insert(stockMovements).values({
+            inventoryId: newInventoryItem.id,
+            movementType: "in",
+            quantity: item.quantity,
+            previousStock: "0",
+            newStock: item.quantity,
+            reason: "Compra inicial - producto nuevo",
+            reference: `Compra #${purchase.id}`,
+            createdBy: "system",
+          });
+        } else if (inventoryId) {
+          // Update existing inventory stock
+          const [currentItem] = await tx.select().from(inventory).where(eq(inventory.id, inventoryId));
+          if (currentItem) {
+            const previousStock = Number(currentItem.currentStock);
+            const addedQuantity = Number(item.quantity);
+            const newStock = previousStock + addedQuantity;
+
+            await tx.update(inventory)
+              .set({ 
+                currentStock: newStock.toString(),
+                updatedAt: new Date(),
+              })
+              .where(eq(inventory.id, inventoryId));
+
+            // Log stock movement
+            await tx.insert(stockMovements).values({
+              inventoryId,
+              movementType: "in",
+              quantity: item.quantity,
+              previousStock: previousStock.toString(),
+              newStock: newStock.toString(),
+              reason: "Compra de inventario",
+              reference: `Compra #${purchase.id}`,
+              createdBy: "system",
+            });
+          }
+        }
+
+        // Create purchase item record
+        await tx.insert(purchaseItems).values({
+          purchaseId: purchase.id,
+          product: item.product,
+          unit: item.unit,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          totalAmount: item.totalAmount,
+          category: item.category,
+          inventoryId,
+        });
+      }
+
+      return purchase;
+    });
+  }
+
   async updatePurchase(id: number, purchase: Partial<InsertPurchase>): Promise<Purchase> {
     const [updatedPurchase] = await db
       .update(purchases)
