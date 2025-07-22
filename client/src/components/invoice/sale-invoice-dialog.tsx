@@ -37,10 +37,23 @@ export default function SaleInvoiceDialog({
   const handleDownload = async () => {
     setIsGenerating(true);
     try {
+      console.log("Sale data:", sale);
+      console.log("Sale items:", saleItems);
+      console.log("Company settings:", companySettings);
+      
       if (saleItems.length === 0) {
         toast({
           title: "Error",
           description: "No se encontraron productos en esta venta.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (!sale || !sale.id) {
+        toast({
+          title: "Error",
+          description: "Datos de venta incompletos.",
           variant: "destructive",
         });
         return;
@@ -73,10 +86,23 @@ export default function SaleInvoiceDialog({
   const handlePrint = async () => {
     setIsGenerating(true);
     try {
+      console.log("Print - Sale data:", sale);
+      console.log("Print - Sale items:", saleItems);
+      console.log("Print - Company settings:", companySettings);
+      
       if (saleItems.length === 0) {
         toast({
           title: "Error",
           description: "No se encontraron productos en esta venta.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (!sale || !sale.id) {
+        toast({
+          title: "Error",
+          description: "Datos de venta incompletos.",
           variant: "destructive",
         });
         return;

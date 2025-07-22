@@ -16,10 +16,12 @@ interface InvoicePDFProps {
 }
 
 export const generateInvoicePDF = ({ sale, saleItems, companyInfo }: InvoicePDFProps) => {
-  const doc = new jsPDF();
-  
-  // Colors and styling
-  const primaryColor = [59, 130, 246]; // Blue
+  try {
+    console.log("Generating PDF with:", { sale, saleItems, companyInfo });
+    const doc = new jsPDF();
+    
+    // Colors and styling
+    const primaryColor = [59, 130, 246]; // Blue
   const secondaryColor = [75, 85, 99]; // Gray
   const accentColor = [16, 185, 129]; // Green
   
@@ -268,7 +270,11 @@ export const generateInvoicePDF = ({ sale, saleItems, companyInfo }: InvoicePDFP
   doc.text(`Factura generada el ${new Date().toLocaleDateString('es-ES')}`, 
            pageWidth / 2, footerY + 8, { align: 'center' });
   
-  return doc;
+    return doc;
+  } catch (error) {
+    console.error("Error in generateInvoicePDF:", error);
+    throw error;
+  }
 };
 
 export const downloadInvoicePDF = (props: InvoicePDFProps) => {
