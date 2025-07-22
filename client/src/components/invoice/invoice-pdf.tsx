@@ -49,12 +49,11 @@ export const generateInvoicePDF = ({ sale, saleItems, companyInfo }: InvoicePDFP
   
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
-  const companyDetails = [
-    companyInfo?.address || 'Dirección de la empresa',
-    `Tel: ${companyInfo?.phone || 'N/A'}`,
-    `Email: ${companyInfo?.email || 'N/A'}`,
-    `RNC: ${companyInfo?.taxId || 'N/A'}`
-  ].filter(detail => !detail.includes('N/A')); // Solo mostrar datos disponibles
+  const companyDetails = [];
+  if (companyInfo?.address) companyDetails.push(companyInfo.address);
+  if (companyInfo?.phone) companyDetails.push(`Tel: ${companyInfo.phone}`);
+  if (companyInfo?.email) companyDetails.push(`Email: ${companyInfo.email}`);
+  if (companyInfo?.taxId) companyDetails.push(`RNC: ${companyInfo.taxId}`);
   
   companyDetails.forEach((detail, index) => {
     doc.text(detail, margin, yPosition + 25 + (index * 5));
@@ -193,11 +192,11 @@ export const generateInvoicePDF = ({ sale, saleItems, companyInfo }: InvoicePDFP
     xPos = margin + 2;
     doc.text(item.productName || 'Producto', xPos, rowY + 6);
     xPos += colWidths[0];
-    doc.text(Number(item.quantity || 0).toFixed(2), xPos, rowY + 6);
+    doc.text(Number(item.quantity || 0).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), xPos, rowY + 6);
     xPos += colWidths[1];
-    doc.text(`$${Number(item.unitPrice || 0).toFixed(2)}`, xPos, rowY + 6);
+    doc.text(`$${Number(item.unitPrice || 0).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, xPos, rowY + 6);
     xPos += colWidths[2];
-    doc.text(`$${Number(item.subtotal || 0).toFixed(2)}`, xPos, rowY + 6);
+    doc.text(`$${Number(item.subtotal || 0).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, xPos, rowY + 6);
   });
   
   // Table border
@@ -225,14 +224,14 @@ export const generateInvoicePDF = ({ sale, saleItems, companyInfo }: InvoicePDFP
   
   // Subtotal
   doc.text('Subtotal:', totalsX + 2, yPosition + 5);
-  doc.text(`$${Number(sale.subtotal || 0).toFixed(2)}`, 
+  doc.text(`$${Number(sale.subtotal || 0).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 
            totalsX + totalsWidth - 2, yPosition + 5, { align: 'right' });
   
   // Tax
   if (Number(sale.taxAmount) > 0) {
     yPosition += 8;
     doc.text(`ITEBIS (${Number(sale.taxRate || 0)}%):`, totalsX + 2, yPosition + 5);
-    doc.text(`$${Number(sale.taxAmount || 0).toFixed(2)}`, 
+    doc.text(`$${Number(sale.taxAmount || 0).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 
              totalsX + totalsWidth - 2, yPosition + 5, { align: 'right' });
   }
   
@@ -240,7 +239,7 @@ export const generateInvoicePDF = ({ sale, saleItems, companyInfo }: InvoicePDFP
   if (Number(sale.discountAmount) > 0) {
     yPosition += 8;
     doc.text('Descuento:', totalsX + 2, yPosition + 5);
-    doc.text(`-$${Number(sale.discountAmount || 0).toFixed(2)}`, 
+    doc.text(`-$${Number(sale.discountAmount || 0).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 
              totalsX + totalsWidth - 2, yPosition + 5, { align: 'right' });
   }
   
@@ -256,7 +255,7 @@ export const generateInvoicePDF = ({ sale, saleItems, companyInfo }: InvoicePDFP
   doc.setFontSize(12);
   doc.setTextColor(accentColor[0], accentColor[1], accentColor[2]);
   doc.text('TOTAL:', totalsX + 2, yPosition + 5);
-  doc.text(`$${Number(sale.total || 0).toFixed(2)}`, 
+  doc.text(`$${Number(sale.total || 0).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 
            totalsX + totalsWidth - 2, yPosition + 5, { align: 'right' });
   
   yPosition += 20;
