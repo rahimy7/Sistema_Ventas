@@ -109,6 +109,23 @@ The system manages seven main entities:
 
 ## Recent Changes (January 2025)
 
+### Enhanced Purchase Management System (July 2025)
+- ✓ Improved purchase form to allow selection between existing and new products
+- ✓ Added inventory integration for existing product selection with stock display
+- ✓ Implemented automatic inventory creation for new products during purchase
+- ✓ Added automatic stock adjustment for existing products when purchased
+- ✓ Enhanced UI with product selection toggle and inventory item details
+- ✓ Integrated price and sale price management for new products
+- ✓ Added reorder point configuration for new inventory items
+
+### Previous Updates - Navigation System Fix
+- ✓ Fixed reports page navigation by adding missing "/reportes" path to sidebar
+- ✓ Created missing monthly-report-pdf component for PDF generation
+- ✓ Resolved import errors preventing reports page from loading
+- ✓ Fixed database connection issues with proper Neon WebSocket configuration
+
+## Previous Changes (January 2025)
+
 ### Enhanced Navigation System Implementation
 - ✓ Added HomeButton component to all pages for direct access to dashboard
 - ✓ Created comprehensive sidebar navigation with route-based highlighting

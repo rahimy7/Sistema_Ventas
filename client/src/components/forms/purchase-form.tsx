@@ -1,6 +1,6 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,11 +8,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { insertPurchaseSchema, type InsertPurchase, type Purchase } from "@shared/schema";
+import { insertPurchaseSchema, insertInventorySchema, type InsertPurchase, type Purchase, type InventoryItem, type InsertInventoryItem } from "@shared/schema";
 import { useState, useEffect } from "react";
-import { Calculator, Package, User, CreditCard } from "lucide-react";
+import { Calculator, Package, User, CreditCard, Plus, Search } from "lucide-react";
 
 interface PurchaseFormProps {
   purchase?: Purchase | null;
@@ -47,6 +49,15 @@ export default function PurchaseForm({ purchase, onSuccess, onCancel }: Purchase
   const [quantity, setQuantity] = useState<number>(0);
   const [unitPrice, setUnitPrice] = useState<number>(0);
   const [total, setTotal] = useState<number>(0);
+  const [isNewProduct, setIsNewProduct] = useState(true);
+  const [selectedInventoryItem, setSelectedInventoryItem] = useState<InventoryItem | null>(null);
+  const [salePrice, setSalePrice] = useState<number>(0);
+  const [reorderPoint, setReorderPoint] = useState<number>(0);
+
+  // Fetch existing inventory items
+  const { data: inventoryItems = [] } = useQuery<InventoryItem[]>({
+    queryKey: ["/api/inventory"],
+  });
 
   const form = useForm<InsertPurchase>({
     resolver: zodResolver(insertPurchaseSchema),
@@ -78,6 +89,30 @@ export default function PurchaseForm({ purchase, onSuccess, onCancel }: Purchase
 
   const createMutation = useMutation({
     mutationFn: async (data: InsertPurchase) => {
+      // If it's a new product and we need to add it to inventory
+      if (isNewProduct && !purchase) {
+        const inventoryData: InsertInventoryItem = {
+          productName: data.product,
+          unit: data.unit,
+          purchasePrice: data.unitPrice,
+          salePrice: salePrice.toString(),
+          initialStock: data.quantity,
+          reorderPoint: reorderPoint.toString(),
+        };
+        
+        // Create inventory item first
+        await apiRequest("/api/inventory", "POST", inventoryData);
+      } else if (!isNewProduct && selectedInventoryItem) {
+        // Update existing inventory item's stock
+        const adjustment = parseFloat(data.quantity);
+        await apiRequest(`/api/inventory/${selectedInventoryItem.id}/adjust-stock`, "PUT", {
+          adjustment,
+          reason: "Compra",
+          reference: `Compra - ${data.supplier}`,
+        });
+      }
+
+      // Then create the purchase record
       const url = purchase ? `/api/purchases/${purchase.id}` : "/api/purchases";
       const method = purchase ? "PUT" : "POST";
       return apiRequest(url, method, data);
@@ -89,6 +124,7 @@ export default function PurchaseForm({ purchase, onSuccess, onCancel }: Purchase
       });
       queryClient.invalidateQueries({ queryKey: ["/api/purchases"] });
       queryClient.invalidateQueries({ queryKey: ["/api/purchases/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
       if (!purchase) form.reset();
       onSuccess?.();
@@ -121,6 +157,20 @@ export default function PurchaseForm({ purchase, onSuccess, onCancel }: Purchase
     setUnitPrice(price);
     form.setValue("unitPrice", value);
     calculateTotal(quantity, price);
+  };
+
+  const handleInventoryItemSelect = (itemId: string) => {
+    const item = inventoryItems.find(inv => inv.id.toString() === itemId);
+    if (item) {
+      setSelectedInventoryItem(item);
+      form.setValue("product", item.productName);
+      form.setValue("unit", item.unit);
+      form.setValue("unitPrice", item.purchasePrice);
+      setUnitPrice(parseFloat(item.purchasePrice));
+      setSalePrice(parseFloat(item.salePrice));
+      setReorderPoint(parseFloat(item.reorderPoint));
+      calculateTotal(quantity, parseFloat(item.purchasePrice));
+    }
   };
 
   const onSubmit = (data: InsertPurchase) => {
@@ -197,12 +247,73 @@ export default function PurchaseForm({ purchase, onSuccess, onCancel }: Purchase
           </CardContent>
         </Card>
 
+        {/* Product Selection Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Search className="h-5 w-5" />
+              Selección de Producto
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Switch 
+                  id="new-product"
+                  checked={isNewProduct}
+                  onCheckedChange={setIsNewProduct}
+                />
+                <Label htmlFor="new-product" className="font-medium">
+                  {isNewProduct ? "Producto nuevo" : "Producto existente"}
+                </Label>
+              </div>
+              <Badge variant={isNewProduct ? "default" : "secondary"}>
+                {isNewProduct ? "Crear nuevo" : "Del inventario"}
+              </Badge>
+            </div>
+
+            {!isNewProduct && (
+              <div className="space-y-4">
+                <Label>Seleccionar producto existente</Label>
+                <Select onValueChange={handleInventoryItemSelect}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Buscar producto en inventario..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {inventoryItems.map((item) => (
+                      <SelectItem key={item.id} value={item.id.toString()}>
+                        <div className="flex justify-between items-center w-full">
+                          <span>{item.productName}</span>
+                          <Badge variant="outline" className="ml-2">
+                            Stock: {item.currentStock}
+                          </Badge>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {selectedInventoryItem && (
+                  <div className="p-3 bg-blue-50 rounded-lg border">
+                    <h4 className="font-medium text-blue-900 mb-2">Producto seleccionado:</h4>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div><span className="text-gray-600">Precio compra:</span> ${selectedInventoryItem.purchasePrice}</div>
+                      <div><span className="text-gray-600">Precio venta:</span> ${selectedInventoryItem.salePrice}</div>
+                      <div><span className="text-gray-600">Stock actual:</span> {selectedInventoryItem.currentStock}</div>
+                      <div><span className="text-gray-600">Unidad:</span> {selectedInventoryItem.unit}</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Product Details Card */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Package className="h-5 w-5" />
-              Detalles del Producto
+              {isNewProduct ? "Detalles del Nuevo Producto" : "Detalles de la Compra"}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -213,12 +324,45 @@ export default function PurchaseForm({ purchase, onSuccess, onCancel }: Purchase
                 <FormItem>
                   <FormLabel>Producto o Servicio *</FormLabel>
                   <FormControl>
-                    <Input placeholder="Descripción del producto o servicio" {...field} />
+                    <Input 
+                      placeholder="Descripción del producto o servicio" 
+                      {...field}
+                      disabled={!isNewProduct && selectedInventoryItem !== null}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
+
+            {isNewProduct && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-green-50 rounded-lg border border-green-200">
+                <div>
+                  <Label htmlFor="salePrice">Precio de Venta *</Label>
+                  <Input
+                    id="salePrice"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="0.00"
+                    value={salePrice}
+                    onChange={(e) => setSalePrice(parseFloat(e.target.value) || 0)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="reorderPoint">Punto de Reorden *</Label>
+                  <Input
+                    id="reorderPoint"
+                    type="number"
+                    step="1"
+                    min="0"
+                    placeholder="0"
+                    value={reorderPoint}
+                    onChange={(e) => setReorderPoint(parseFloat(e.target.value) || 0)}
+                  />
+                </div>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
@@ -252,7 +396,11 @@ export default function PurchaseForm({ purchase, onSuccess, onCancel }: Purchase
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Unidad de Medida *</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select 
+                      onValueChange={field.onChange} 
+                      defaultValue={field.value}
+                      disabled={!isNewProduct && selectedInventoryItem !== null}
+                    >
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Seleccionar unidad" />
