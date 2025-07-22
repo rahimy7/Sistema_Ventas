@@ -48,6 +48,18 @@ export default function SaleFormEnhanced({ onSuccess }: SaleFormProps) {
   const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
   const [completedSale, setCompletedSale] = useState<Sale | null>(null);
 
+  // Manejar cierre del diálogo de factura
+  useEffect(() => {
+    const handleDialogClosed = () => {
+      console.log("Invoice dialog closed - resetting form");
+      form.reset();
+      onSuccess?.();
+    };
+
+    window.addEventListener('invoiceDialogClosed', handleDialogClosed);
+    return () => window.removeEventListener('invoiceDialogClosed', handleDialogClosed);
+  }, [form, onSuccess]);
+
   const form = useForm<SaleFormData>({
     resolver: zodResolver(saleFormSchema),
     defaultValues: {
@@ -130,6 +142,8 @@ export default function SaleFormEnhanced({ onSuccess }: SaleFormProps) {
         setCompletedSale(saleData);
         setInvoiceDialogOpen(true);
         console.log("Invoice dialog should open now");
+        
+        // Form will be reset when dialog closes via event listener
       } else {
         console.log("Sale data missing or incomplete:", sale);
         // If no sale ID, still try to open dialog with form data
@@ -157,11 +171,14 @@ export default function SaleFormEnhanced({ onSuccess }: SaleFormProps) {
         setCompletedSale(fallbackSale);
         setInvoiceDialogOpen(true);
         console.log("Opening dialog with fallback data");
+        
+        // Form will be reset when dialog closes via event listener
       }
       
-      form.reset();
+      // Stop processing indicator
       setIsProcessing(false);
-      onSuccess?.();
+      
+      // Form will be reset when dialog closes via event listener
     },
     onError: (error: any) => {
       setIsProcessing(false);

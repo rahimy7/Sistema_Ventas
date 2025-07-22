@@ -71,6 +71,11 @@ export default function SaleInvoiceDialog({
       });
       
       onOpenChange(false);
+      
+      // Ensure parent component knows dialog was closed
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('invoiceDialogClosed'));
+      }, 100);
     } catch (error) {
       console.error("Error generating PDF:", error);
       toast({
@@ -120,6 +125,11 @@ export default function SaleInvoiceDialog({
       });
       
       onOpenChange(false);
+      
+      // Ensure parent component knows dialog was closed
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('invoiceDialogClosed'));
+      }, 100);
     } catch (error) {
       console.error("Error printing PDF:", error);
       toast({
