@@ -18,14 +18,19 @@ import {
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Dashboard routes
+  // Dashboard routes with proper error handling
   app.get("/api/dashboard/stats", async (req, res) => {
     try {
       const stats = await storage.getDashboardStats();
       res.json(stats);
     } catch (error) {
       console.error("Error fetching dashboard stats:", error);
-      res.status(500).json({ message: "Failed to fetch dashboard stats" });
+      // Provide more specific error handling for database connection issues
+      if (error instanceof Error && (error.message.includes('connection') || error.message.includes('timeout'))) {
+        res.status(503).json({ message: "Database connection error. Please try again." });
+      } else {
+        res.status(500).json({ message: "Failed to fetch dashboard stats" });
+      }
     }
   });
 
