@@ -1,6 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/useAuth";
 import {
   Home,
   Package,
@@ -9,7 +10,9 @@ import {
   BarChart3,
   Settings,
   Menu,
-  X
+  X,
+  LogOut,
+  User
 } from "lucide-react";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -19,23 +22,50 @@ interface SidebarNavigationProps {
   className?: string;
 }
 
-const navigationItems = [
-  { href: "/", label: "Inicio", icon: Home, color: "text-blue-600" },
-  { href: "/inventario", label: "Inventario", icon: Package, color: "text-purple-600" },
-  { href: "/ventas", label: "Ventas", icon: ShoppingCart, color: "text-green-600" },
-  { href: "/compras", label: "Compras", icon: ShoppingBag, color: "text-orange-600" },
-  { href: "/reportes", label: "Reportes", icon: BarChart3, color: "text-indigo-600" },
-  { href: "/configuracion", label: "Configuración", icon: Settings, color: "text-gray-600" },
+const getAllNavigationItems = () => [
+  { href: "/", label: "Inicio", icon: Home, color: "text-blue-600", roles: ['admin', 'sales', 'viewer'] },
+  { href: "/inventario", label: "Inventario", icon: Package, color: "text-purple-600", roles: ['admin', 'sales', 'viewer'] },
+  { href: "/ventas", label: "Ventas", icon: ShoppingCart, color: "text-green-600", roles: ['admin', 'sales'] },
+  { href: "/compras", label: "Compras", icon: ShoppingBag, color: "text-orange-600", roles: ['admin'] },
+  { href: "/reportes", label: "Reportes", icon: BarChart3, color: "text-indigo-600", roles: ['admin'] },
+  { href: "/configuracion", label: "Configuración", icon: Settings, color: "text-gray-600", roles: ['admin'] },
 ];
 
 export default function SidebarNavigation({ className }: SidebarNavigationProps) {
   const [location] = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { user, logout } = useAuth();
 
   // Obtener configuración de la empresa
   const { data: companySettings } = useQuery<CompanySettings>({
     queryKey: ["/api/company-settings"],
   });
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      window.location.reload();
+    } catch (error) {
+      console.error("Error during logout:", error);
+    }
+  };
+
+  const getRoleDisplayName = (role: string): string => {
+    const roleNames = {
+      admin: "Administrador",
+      sales: "Ventas", 
+      viewer: "Visor"
+    };
+    return roleNames[role as keyof typeof roleNames] || role;
+  };
+
+  // Filter navigation items based on user role
+  const getVisibleNavigationItems = () => {
+    if (!user) return [];
+    return getAllNavigationItems().filter(item => 
+      item.roles.includes(user.role as any)
+    );
+  };
 
   return (
     <>
@@ -77,7 +107,7 @@ export default function SidebarNavigation({ className }: SidebarNavigationProps)
 
           {/* Navigation */}
           <nav className="flex-1 space-y-2 p-4">
-            {navigationItems.map((item) => {
+            {getVisibleNavigationItems().map((item) => {
               const isActive = location === item.href;
               const Icon = item.icon;
               
@@ -106,9 +136,37 @@ export default function SidebarNavigation({ className }: SidebarNavigationProps)
             })}
           </nav>
 
-          {/* Footer */}
-          <div className="border-t border-gray-200 p-4">
-            <div className="text-center">
+          {/* User Info & Logout */}
+          <div className="border-t border-gray-200 p-4 space-y-3">
+            {user && (
+              <div className="flex items-center space-x-3 mb-3">
+                <div className="flex-shrink-0">
+                  <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                    <User className="w-4 h-4 text-blue-600" />
+                  </div>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-900 truncate">
+                    {user.fullName}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    {getRoleDisplayName(user.role)}
+                  </p>
+                </div>
+              </div>
+            )}
+            
+            <Button
+              onClick={handleLogout}
+              variant="outline"
+              size="sm"
+              className="w-full justify-start space-x-2 text-red-600 border-red-200 hover:bg-red-50"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>Cerrar Sesión</span>
+            </Button>
+            
+            <div className="text-center pt-2">
               <p className="text-xs text-gray-500">v1.0.0</p>
               <p className="text-xs text-gray-400">Sistema de Gestión</p>
             </div>

@@ -1,6 +1,8 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import session from "express-session";
+import { loginSchema, type User, type LoginCredentials } from "@shared/schema";
 import {
   insertIncomeSchema,
   insertExpenseSchema,
@@ -17,9 +19,87 @@ import {
 } from "@shared/schema";
 import { z } from "zod";
 
+// Extend Express session to include user
+declare module 'express-session' {
+  interface SessionData {
+    user?: User;
+  }
+}
+
+// Middleware for authentication
+function requireAuth(req: any, res: any, next: any) {
+  if (!req.session.user) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+  next();
+}
+
+// Middleware for role-based access
+function requireRole(roles: string[]) {
+  return (req: any, res: any, next: any) => {
+    if (!req.session.user || !roles.includes(req.session.user.role)) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    next();
+  };
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Dashboard routes with proper error handling
-  app.get("/api/dashboard/stats", async (req, res) => {
+  // Configure sessions
+  app.use(session({
+    secret: process.env.SESSION_SECRET || 'automotive-business-secret-key',
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: false, // Set to true in production with HTTPS
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    },
+  }));
+
+  // Authentication routes
+  app.post("/api/login", async (req, res) => {
+    try {
+      const credentials = loginSchema.parse(req.body);
+      const user = await storage.authenticateUser(credentials);
+      
+      if (!user) {
+        return res.status(401).json({ message: "Usuario o contraseña incorrectos" });
+      }
+
+      req.session.user = user;
+      res.json({ 
+        message: "Login successful", 
+        user: { id: user.id, username: user.username, fullName: user.fullName, role: user.role }
+      });
+    } catch (error) {
+      console.error("Login error:", error);
+      res.status(400).json({ message: "Error en el login" });
+    }
+  });
+
+  app.post("/api/logout", (req, res) => {
+    req.session.destroy((err) => {
+      if (err) {
+        return res.status(500).json({ message: "Error logging out" });
+      }
+      res.json({ message: "Logout successful" });
+    });
+  });
+
+  app.get("/api/auth/user", (req, res) => {
+    if (req.session.user) {
+      res.json({ 
+        id: req.session.user.id, 
+        username: req.session.user.username, 
+        fullName: req.session.user.fullName, 
+        role: req.session.user.role 
+      });
+    } else {
+      res.status(401).json({ message: "Not authenticated" });
+    }
+  });
+  // Dashboard routes with proper error handling - requires authentication
+  app.get("/api/dashboard/stats", requireAuth, async (req, res) => {
     try {
       const stats = await storage.getDashboardStats();
       res.json(stats);
@@ -34,8 +114,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Income routes
-  app.get("/api/incomes", async (req, res) => {
+  // Income routes - admin/sales can manage
+  app.get("/api/incomes", requireAuth, requireRole(['admin', 'sales']), async (req, res) => {
     try {
       const incomes = await storage.getIncomes();
       res.json(incomes);
@@ -45,7 +125,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/incomes/:id", async (req, res) => {
+  app.get("/api/incomes/:id", requireAuth, requireRole(['admin', 'sales']), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const income = await storage.getIncomeById(id);
@@ -59,7 +139,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/incomes", async (req, res) => {
+  app.post("/api/incomes", requireAuth, requireRole(['admin', 'sales']), async (req, res) => {
     try {
       const data = insertIncomeSchema.parse(req.body);
       const income = await storage.createIncome(data);
@@ -73,7 +153,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/incomes/:id", async (req, res) => {
+  app.put("/api/incomes/:id", requireAuth, requireRole(['admin', 'sales']), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const data = insertIncomeSchema.partial().parse(req.body);
@@ -88,7 +168,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/incomes/:id", async (req, res) => {
+  app.delete("/api/incomes/:id", requireAuth, requireRole(['admin', 'sales']), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       await storage.deleteIncome(id);
@@ -99,8 +179,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Expense routes
-  app.get("/api/expenses", async (req, res) => {
+  // Expense routes - admin only for modification, all can view
+  app.get("/api/expenses", requireAuth, async (req, res) => {
     try {
       const expenses = await storage.getExpenses();
       res.json(expenses);
@@ -110,7 +190,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/expenses/categories", async (req, res) => {
+  app.get("/api/expenses/categories", requireAuth, async (req, res) => {
     try {
       const categories = await storage.getExpensesByCategory();
       res.json(categories);
@@ -120,7 +200,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/expenses", async (req, res) => {
+  app.post("/api/expenses", requireAuth, requireRole(['admin']), async (req, res) => {
     try {
       const data = insertExpenseSchema.parse(req.body);
       const expense = await storage.createExpense(data);
@@ -134,7 +214,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/expenses/:id", async (req, res) => {
+  app.put("/api/expenses/:id", requireAuth, requireRole(['admin']), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const data = insertExpenseSchema.partial().parse(req.body);
@@ -149,7 +229,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/expenses/:id", async (req, res) => {
+  app.delete("/api/expenses/:id", requireAuth, requireRole(['admin']), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       await storage.deleteExpense(id);
@@ -160,8 +240,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Purchase routes
-  app.get("/api/purchases", async (req, res) => {
+  // Purchase routes - admin only
+  app.get("/api/purchases", requireAuth, requireRole(['admin']), async (req, res) => {
     try {
       const purchases = await storage.getPurchases();
       res.json(purchases);
@@ -171,7 +251,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/purchases/stats", async (req, res) => {
+  app.get("/api/purchases/stats", requireAuth, requireRole(['admin']), async (req, res) => {
     try {
       const stats = await storage.getPurchaseStats();
       res.json(stats);
@@ -181,7 +261,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/purchases", async (req, res) => {
+  app.post("/api/purchases", requireAuth, requireRole(['admin']), async (req, res) => {
     try {
       const { purchaseDate, ...purchaseData } = req.body;
       
@@ -205,7 +285,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/purchases/:id", async (req, res) => {
+  app.put("/api/purchases/:id", requireAuth, requireRole(['admin']), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const data = insertPurchaseSchema.partial().parse(req.body);
@@ -220,7 +300,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/purchases/:id", async (req, res) => {
+  app.delete("/api/purchases/:id", requireAuth, requireRole(['admin']), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       await storage.deletePurchase(id);
@@ -232,7 +312,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Enhanced purchase endpoint for multiple items
-  app.post("/api/purchases/enhanced", async (req, res) => {
+  app.post("/api/purchases/enhanced", requireAuth, requireRole(['admin']), async (req, res) => {
     try {
       const { purchaseDate, ...purchaseData } = req.body;
       
@@ -250,8 +330,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Inventory routes
-  app.get("/api/inventory", async (req, res) => {
+  // Inventory routes - all roles can view, admin can modify
+  app.get("/api/inventory", requireAuth, async (req, res) => {
     try {
       const items = await storage.getInventoryItems();
       res.json(items);
@@ -261,7 +341,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/inventory", async (req, res) => {
+  app.post("/api/inventory", requireAuth, requireRole(['admin']), async (req, res) => {
     try {
       const data = insertInventorySchema.parse(req.body);
       const item = await storage.createInventoryItem(data);
@@ -275,7 +355,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/inventory/:id", async (req, res) => {
+  app.put("/api/inventory/:id", requireAuth, requireRole(['admin']), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const data = insertInventorySchema.partial().parse(req.body);
@@ -290,7 +370,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/inventory/:id/adjust-stock", async (req, res) => {
+  app.put("/api/inventory/:id/adjust-stock", requireAuth, requireRole(['admin']), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const { adjustment, reason, reference } = req.body;
@@ -303,7 +383,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Stock movements routes
-  app.get("/api/stock-movements", async (req, res) => {
+  app.get("/api/stock-movements", requireAuth, async (req, res) => {
     try {
       const movements = await storage.getStockMovements();
       res.json(movements);
@@ -313,7 +393,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/inventory/:id/movements", async (req, res) => {
+  app.get("/api/inventory/:id/movements", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const movements = await storage.getStockMovementsByInventory(id);

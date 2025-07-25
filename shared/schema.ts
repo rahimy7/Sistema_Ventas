@@ -1,7 +1,23 @@
-import { pgTable, text, serial, integer, decimal, timestamp, varchar, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, decimal, timestamp, varchar, boolean, pgEnum } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+
+// User roles enum
+export const userRoleEnum = pgEnum('user_role', ['admin', 'sales', 'viewer']);
+
+// Users table for authentication
+export const users = pgTable("users", {
+  id: serial("id").primaryKey(),
+  username: varchar("username", { length: 50 }).notNull().unique(),
+  password: text("password").notNull(), // Will store hashed password
+  fullName: text("full_name").notNull(),
+  role: userRoleEnum("role").notNull().default('viewer'),
+  isActive: boolean("is_active").default(true),
+  lastLogin: timestamp("last_login"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
 
 // Income/Revenue tracking
 export const incomes = pgTable("incomes", {
@@ -353,3 +369,28 @@ export type InventoryItemWithMovements = InventoryItem & {
 
 export type CompanySettings = typeof companySettings.$inferSelect;
 export type InsertCompanySettings = z.infer<typeof insertCompanySettingsSchema>;
+
+// Authentication schemas and types
+export const loginSchema = z.object({
+  username: z.string().min(1, "El usuario es requerido"),
+  password: z.string().min(1, "La contraseña es requerida"),
+});
+
+export const insertUserSchema = createInsertSchema(users, {
+  username: z.string().min(3, "El usuario debe tener al menos 3 caracteres"),
+  password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
+  fullName: z.string().min(1, "El nombre completo es requerido"),
+}).omit({ id: true, createdAt: true, updatedAt: true, lastLogin: true });
+
+export type User = typeof users.$inferSelect;
+export type InsertUser = z.infer<typeof insertUserSchema>;
+export type LoginCredentials = z.infer<typeof loginSchema>;
+export type UserRole = 'admin' | 'sales' | 'viewer';
+
+export const insertPurchaseItemSchema = createInsertSchema(purchaseItems).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type PurchaseItem = typeof purchaseItems.$inferSelect;
+export type InsertPurchaseItem = z.infer<typeof insertPurchaseItemSchema>;

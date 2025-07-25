@@ -1,4 +1,5 @@
 import {
+  users,
   incomes,
   expenses,
   purchases,
@@ -38,9 +39,14 @@ import {
   type InsertSaleItem,
   type CompanySettings,
   type InsertCompanySettings,
+  type User,
+  type InsertUser,
+  type LoginCredentials,
+  type UserRole
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, sum, count, gte, lte, and, like } from "drizzle-orm";
+import bcrypt from "bcryptjs";
 
 export interface IStorage {
   // Income operations
@@ -125,6 +131,13 @@ export interface IStorage {
     totalInvoices: number;
     pendingInvoices: number;
   }>;
+
+  // User authentication
+  getUserById(id: number): Promise<User | undefined>;
+  getUserByUsername(username: string): Promise<User | undefined>;
+  createUser(user: InsertUser): Promise<User>;
+  authenticateUser(credentials: LoginCredentials): Promise<User | null>;
+  updateUserLastLogin(id: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -753,6 +766,50 @@ export class DatabaseStorage implements IStorage {
       .where(eq(companySettings.id, id))
       .returning();
     return updatedSettings;
+  }
+
+  // User authentication operations
+  async getUserById(id: number): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user;
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user;
+  }
+
+  async createUser(user: InsertUser): Promise<User> {
+    const hashedPassword = await bcrypt.hash(user.password, 10);
+    const [newUser] = await db.insert(users).values({
+      ...user,
+      password: hashedPassword,
+    }).returning();
+    return newUser;
+  }
+
+  async authenticateUser(credentials: LoginCredentials): Promise<User | null> {
+    const user = await this.getUserByUsername(credentials.username);
+    if (!user || !user.isActive) {
+      return null;
+    }
+
+    const isPasswordValid = await bcrypt.compare(credentials.password, user.password);
+    if (!isPasswordValid) {
+      return null;
+    }
+
+    // Update last login
+    await this.updateUserLastLogin(user.id);
+    
+    return user;
+  }
+
+  async updateUserLastLogin(id: number): Promise<void> {
+    await db
+      .update(users)
+      .set({ lastLogin: new Date() })
+      .where(eq(users.id, id));
   }
 }
 
