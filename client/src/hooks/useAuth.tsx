@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { getQueryFn } from "@/lib/queryClient";
 import { type User, type UserRole } from "@shared/schema";
 
 interface AuthContextType {
@@ -22,6 +23,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Query to get current user
   const { data: userData, isLoading } = useQuery({
     queryKey: ["/api/auth/user"],
+    queryFn: getQueryFn({ on401: "returnNull" }),
     retry: false,
     refetchOnWindowFocus: false,
   });
@@ -42,6 +44,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(credentials),
+        credentials: "include", // Include cookies for session management
       });
 
       if (!response.ok) {
@@ -72,6 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     mutationFn: async () => {
       const response = await fetch("/api/logout", {
         method: "POST",
+        credentials: "include", // Include cookies for session management
       });
 
       if (!response.ok) {

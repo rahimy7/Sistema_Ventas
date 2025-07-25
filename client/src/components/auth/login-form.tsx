@@ -35,6 +35,7 @@ export function LoginForm({ onLoginSuccess }: LoginFormProps) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(credentials),
+        credentials: "include", // Include cookies for session management
       });
 
       if (!response.ok) {
