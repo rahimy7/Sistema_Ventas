@@ -72,11 +72,8 @@ app.use((req, res, next) => {
     });
   }
 
-  // For Vercel, export the app
-  if (process.env.VERCEL) {
-    module.exports = app;
-  } else {
-    // For local development
+  // Handle both Vercel and local development
+  if (!process.env.VERCEL) {
     const port = parseInt(process.env.PORT || '5000', 10);
     server.listen(port, "0.0.0.0", () => {
       console.log(`Server running on port ${port}`);
@@ -84,5 +81,5 @@ app.use((req, res, next) => {
   }
 })();
 
-// Export for Vercel
+// Use ESM exports consistently
 export default app;
