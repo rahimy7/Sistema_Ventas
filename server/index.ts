@@ -18,6 +18,16 @@ app.use(express.urlencoded({ extended: false }));
 // Trust proxy for Vercel
 app.set('trust proxy', 1);
 
+// Add health check endpoint BEFORE other middleware
+app.get("/api/health", (_req, res) => {
+  res.json({
+    status: "ok",
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    environment: process.env.NODE_ENV
+  });
+});
+
 app.use((req, res, next) => {
   const start = Date.now();
   const reqPath = req.path;
@@ -72,14 +82,20 @@ app.use((req, res, next) => {
     });
   }
 
-  // Handle both Vercel and local development
+  // Modify the server listen logic to work with Railway
   if (!process.env.VERCEL) {
     const port = parseInt(process.env.PORT || '5000', 10);
-    server.listen(port, "0.0.0.0", () => {
-      console.log(`Server running on port ${port}`);
+    const host = process.env.NODE_ENV === 'production' ? '0.0.0.0' : 'localhost';
+    
+    server.listen(port, host, () => {
+      console.log(`Server running on ${host}:${port}`);
+      console.log(`Health check available at http://${host}:${port}/api/health`);
     });
   }
-})();
+})().catch(error => {
+  console.error('Failed to start server:', error);
+  process.exit(1);
+});
 
 // Use ESM exports consistently
 export default app;
