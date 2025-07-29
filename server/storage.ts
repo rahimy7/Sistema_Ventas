@@ -43,8 +43,8 @@ import {
   type InsertUser,
   type LoginCredentials,
   type UserRole
-} from "@shared/schema";
-import { db } from "./db";
+} from "../shared/schema.js";
+import { db } from "./db.js";
 import { eq, desc, sum, count, gte, lte, and, like } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 

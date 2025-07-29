@@ -1,8 +1,10 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { storage } from "./storage";
+import { storage } from "./storage.js";
 import session from "express-session";
-import { loginSchema, type User, type LoginCredentials } from "@shared/schema";
+import ConnectPgSimple from "connect-pg-simple";
+import { pool } from "./db.js";
+import { loginSchema, type User, type LoginCredentials } from "../shared/schema.js";
 import {
   insertIncomeSchema,
   insertExpenseSchema,
@@ -16,7 +18,7 @@ import {
   insertSaleSchema,
   insertSaleItemSchema,
   insertCompanySettingsSchema,
-} from "@shared/schema";
+} from "../shared/schema.js";
 import { z } from "zod";
 
 // Extend Express session to include user
@@ -45,30 +47,46 @@ function requireRole(roles: string[]) {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Configure sessions
-  app.use(session({
-    secret: process.env.SESSION_SECRET || 'automotive-business-secret-key',
+  // Configure sessions with memory store for development, PostgreSQL for production
+  let sessionStore: session.Store | undefined;
+
+  if (process.env.NODE_ENV === 'production') {
+    const PgSession = ConnectPgSimple(session);
+    sessionStore = new PgSession({
+      pool: pool,
+      tableName: 'user_sessions',
+      createTableIfMissing: true,
+    });
+  }
+
+  const sessionConfig: session.SessionOptions = {
+    store: sessionStore,
+    secret: process.env.SESSION_SECRET || 'default-secret-key-change-in-production',
     resave: false,
     saveUninitialized: false,
     cookie: {
-      secure: false, // Set to true in production with HTTPS
+      secure: process.env.NODE_ENV === 'production' && !process.env.VERCEL,
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      httpOnly: true,
+      sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
     },
-  }));
+  };
+
+  app.use(session(sessionConfig));
 
   // Authentication routes
   app.post("/api/login", async (req, res) => {
     try {
       const credentials = loginSchema.parse(req.body);
       const user = await storage.authenticateUser(credentials);
-      
+
       if (!user) {
         return res.status(401).json({ message: "Usuario o contraseña incorrectos" });
       }
 
       req.session.user = user;
-      res.json({ 
-        message: "Login successful", 
+      res.json({
+        message: "Login successful",
         user: { id: user.id, username: user.username, fullName: user.fullName, role: user.role }
       });
     } catch (error) {
@@ -88,16 +106,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/auth/user", (req, res) => {
     if (req.session.user) {
-      res.json({ 
-        id: req.session.user.id, 
-        username: req.session.user.username, 
-        fullName: req.session.user.fullName, 
-        role: req.session.user.role 
+      res.json({
+        id: req.session.user.id,
+        username: req.session.user.username,
+        fullName: req.session.user.fullName,
+        role: req.session.user.role
       });
     } else {
       res.status(401).json({ message: "Not authenticated" });
     }
   });
+
+  // Health check endpoint
+  app.get("/api/health", (req, res) => {
+    res.json({ status: "ok", timestamp: new Date().toISOString() });
+  });
+
   // Dashboard routes with proper error handling - requires authentication
   app.get("/api/dashboard/stats", requireAuth, async (req, res) => {
     try {
@@ -105,7 +129,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(stats);
     } catch (error) {
       console.error("Error fetching dashboard stats:", error);
-      // Provide more specific error handling for database connection issues
       if (error instanceof Error && (error.message.includes('connection') || error.message.includes('timeout'))) {
         res.status(503).json({ message: "Database connection error. Please try again." });
       } else {
@@ -404,7 +427,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/inventory/:id/with-movements", async (req, res) => {
+  app.get("/api/inventory/:id/with-movements", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const itemWithMovements = await storage.getInventoryItemWithMovements(id);
@@ -418,7 +441,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/inventory/:id", async (req, res) => {
+  app.delete("/api/inventory/:id", requireAuth, requireRole(['admin']), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       await storage.deleteInventoryItem(id);
@@ -430,7 +453,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Employee routes
-  app.get("/api/employees", async (req, res) => {
+  app.get("/api/employees", requireAuth, async (req, res) => {
     try {
       const employees = await storage.getEmployees();
       res.json(employees);
@@ -440,7 +463,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/employees", async (req, res) => {
+  app.post("/api/employees", requireAuth, requireRole(['admin']), async (req, res) => {
     try {
       const data = insertEmployeeSchema.parse(req.body);
       const employee = await storage.createEmployee(data);
@@ -454,7 +477,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/employees/:id", async (req, res) => {
+  app.put("/api/employees/:id", requireAuth, requireRole(['admin']), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const data = insertEmployeeSchema.partial().parse(req.body);
@@ -469,7 +492,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/employees/:id", async (req, res) => {
+  app.delete("/api/employees/:id", requireAuth, requireRole(['admin']), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       await storage.deleteEmployee(id);
@@ -481,7 +504,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Payroll routes
-  app.get("/api/payroll", async (req, res) => {
+  app.get("/api/payroll", requireAuth, requireRole(['admin']), async (req, res) => {
     try {
       const records = await storage.getPayrollRecords();
       res.json(records);
@@ -491,7 +514,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/payroll", async (req, res) => {
+  app.post("/api/payroll", requireAuth, requireRole(['admin']), async (req, res) => {
     try {
       const data = insertPayrollRecordSchema.parse(req.body);
       const record = await storage.createPayrollRecord(data);
@@ -506,7 +529,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Invoice routes
-  app.get("/api/invoices", async (req, res) => {
+  app.get("/api/invoices", requireAuth, async (req, res) => {
     try {
       const invoices = await storage.getInvoices();
       res.json(invoices);
@@ -516,7 +539,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/invoices/:id", async (req, res) => {
+  app.get("/api/invoices/:id", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const invoice = await storage.getInvoiceById(id);
@@ -530,7 +553,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/invoices/generate-number", async (req, res) => {
+  app.get("/api/invoices/generate-number", requireAuth, async (req, res) => {
     try {
       const invoiceNumber = await storage.generateInvoiceNumber();
       res.json({ invoiceNumber });
@@ -540,7 +563,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/invoices", async (req, res) => {
+  app.post("/api/invoices", requireAuth, requireRole(['admin', 'sales']), async (req, res) => {
     try {
       const { items, ...invoiceData } = req.body;
       
@@ -563,7 +586,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/invoices/:id", async (req, res) => {
+  app.put("/api/invoices/:id", requireAuth, requireRole(['admin', 'sales']), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const data = insertInvoiceSchema.partial().parse(req.body);
@@ -578,7 +601,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/invoices/:id/status", async (req, res) => {
+  app.put("/api/invoices/:id/status", requireAuth, requireRole(['admin', 'sales']), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const { status } = req.body;
@@ -590,7 +613,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/invoices/:id", async (req, res) => {
+  app.delete("/api/invoices/:id", requireAuth, requireRole(['admin']), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       await storage.deleteInvoice(id);
@@ -602,7 +625,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Sales routes
-  app.get("/api/sales", async (req, res) => {
+  app.get("/api/sales", requireAuth, async (req, res) => {
     try {
       const sales = await storage.getSales();
       res.json(sales);
@@ -612,7 +635,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/sales/:id", async (req, res) => {
+  app.get("/api/sales/:id", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const sale = await storage.getSaleById(id);
@@ -626,7 +649,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/sales/:id/items", async (req, res) => {
+  app.get("/api/sales/:id/items", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const items = await storage.getSaleItems(id);
@@ -637,7 +660,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/sales/generate-number", async (req, res) => {
+  app.get("/api/sales/generate-number", requireAuth, async (req, res) => {
     try {
       const saleNumber = await storage.generateSaleNumber();
       res.json({ saleNumber });
@@ -647,7 +670,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/sales", async (req, res) => {
+  app.post("/api/sales", requireAuth, requireRole(['admin', 'sales']), async (req, res) => {
     try {
       const { items, ...saleData } = req.body;
       
@@ -675,7 +698,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/sales/:id", async (req, res) => {
+  app.put("/api/sales/:id", requireAuth, requireRole(['admin', 'sales']), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const data = insertSaleSchema.partial().parse(req.body);
@@ -690,7 +713,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/sales/:id", async (req, res) => {
+  app.delete("/api/sales/:id", requireAuth, requireRole(['admin']), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       await storage.deleteSale(id);
@@ -702,7 +725,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Company settings routes
-  app.get("/api/company-settings", async (req, res) => {
+  app.get("/api/company-settings", requireAuth, async (req, res) => {
     try {
       const settings = await storage.getCompanySettings();
       res.json(settings);
@@ -712,7 +735,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/company-settings", async (req, res) => {
+  app.post("/api/company-settings", requireAuth, requireRole(['admin']), async (req, res) => {
     try {
       const data = insertCompanySettingsSchema.parse(req.body);
       const settings = await storage.createCompanySettings(data);
@@ -726,7 +749,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/company-settings/:id", async (req, res) => {
+  app.put("/api/company-settings/:id", requireAuth, requireRole(['admin']), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const data = insertCompanySettingsSchema.partial().parse(req.body);
