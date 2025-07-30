@@ -121,6 +121,12 @@ export interface IStorage {
   updateCompanySettings(id: number, settings: Partial<InsertCompanySettings>): Promise<CompanySettings>;
   generateSaleNumber(): Promise<string>;
 
+  getUsers(): Promise<User[]>;
+updateUser(id: number, user: Partial<InsertUser>): Promise<User>;
+deleteUser(id: number): Promise<void>;
+updateUserPassword(id: number, password: string): Promise<void>;
+toggleUserStatus(id: number): Promise<User>;
+
   // Dashboard analytics
   getDashboardStats(): Promise<{
     monthlyRevenue: number;
@@ -811,6 +817,56 @@ export class DatabaseStorage implements IStorage {
       .set({ lastLogin: new Date() })
       .where(eq(users.id, id));
   }
+
+  async getUsers(): Promise<User[]> {
+  return await db.select().from(users).orderBy(users.fullName);
+}
+
+async updateUser(id: number, userData: Partial<InsertUser>): Promise<User> {
+  const updateData: any = { ...userData, updatedAt: new Date() };
+  
+  // Hash password if provided
+  if (updateData.password) {
+    updateData.password = await bcrypt.hash(updateData.password, 10);
+  }
+  
+  const [updatedUser] = await db
+    .update(users)
+    .set(updateData)
+    .where(eq(users.id, id))
+    .returning();
+  return updatedUser;
+}
+
+async deleteUser(id: number): Promise<void> {
+  await db.delete(users).where(eq(users.id, id));
+}
+
+async updateUserPassword(id: number, password: string): Promise<void> {
+  const hashedPassword = await bcrypt.hash(password, 10);
+  await db
+    .update(users)
+    .set({ 
+      password: hashedPassword,
+      updatedAt: new Date()
+    })
+    .where(eq(users.id, id));
+}
+
+async toggleUserStatus(id: number): Promise<User> {
+  const user = await this.getUserById(id);
+  if (!user) throw new Error("User not found");
+  
+  const [updatedUser] = await db
+    .update(users)
+    .set({ 
+      isActive: !user.isActive,
+      updatedAt: new Date()
+    })
+    .where(eq(users.id, id))
+    .returning();
+  return updatedUser;
+}
 }
 
 export const storage = new DatabaseStorage();

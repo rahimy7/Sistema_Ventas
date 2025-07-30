@@ -4,7 +4,7 @@ import { storage } from "./storage.js";
 import session from "express-session";
 import ConnectPgSimple from "connect-pg-simple";
 import { pool } from "./db.js";
-import { loginSchema, type User, type LoginCredentials } from "../shared/schema.js";
+import { loginSchema, type User, type LoginCredentials, insertUserSchema } from "../shared/schema.js";
 import {
   insertIncomeSchema,
   insertExpenseSchema,
@@ -763,6 +763,134 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to update company settings" });
     }
   });
+
+  // User management routes - admin only
+app.get("/api/users", requireAuth, requireRole(['admin']), async (req, res) => {
+  try {
+    const users = await storage.getUsers();
+    // Remove password from response
+    const safeUsers = users.map(({ password, ...user }) => user);
+    res.json(safeUsers);
+  } catch (error) {
+    console.error("Error fetching users:", error);
+    res.status(500).json({ message: "Failed to fetch users" });
+  }
+});
+
+app.get("/api/users/:id", requireAuth, requireRole(['admin']), async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const user = await storage.getUserById(id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    // Remove password from response
+    const { password, ...safeUser } = user;
+    res.json(safeUser);
+  } catch (error) {
+    console.error("Error fetching user:", error);
+    res.status(500).json({ message: "Failed to fetch user" });
+  }
+});
+
+app.post("/api/users", requireAuth, requireRole(['admin']), async (req, res) => {
+  try {
+    const data = insertUserSchema.parse(req.body);
+    const user = await storage.createUser(data);
+    // Remove password from response
+    const { password, ...safeUser } = user;
+    res.status(201).json(safeUser);
+  } catch (error) {
+    console.error("Error creating user:", error);
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ message: "Invalid data", errors: error.errors });
+    }
+    if (error instanceof Error && (error.message.includes('duplicate key') || error.message.includes('unique constraint'))) {
+      return res.status(409).json({ message: "El nombre de usuario ya existe" });
+    }
+    res.status(500).json({ message: "Failed to create user" });
+  }
+});
+
+app.put("/api/users/:id", requireAuth, requireRole(['admin']), async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const data = insertUserSchema.partial().parse(req.body);
+    
+    // Don't allow updating own role or status
+    if (id === req.session.user?.id) {
+      delete data.role;
+      delete data.isActive;
+    }
+    
+    const user = await storage.updateUser(id, data);
+    // Remove password from response
+    const { password, ...safeUser } = user;
+    res.json(safeUser);
+  } catch (error) {
+    console.error("Error updating user:", error);
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ message: "Invalid data", errors: error.errors });
+    }
+    if (error instanceof Error && (error.message.includes('duplicate key') || error.message.includes('unique constraint'))) {
+      return res.status(409).json({ message: "El nombre de usuario ya existe" });
+    }
+    res.status(500).json({ message: "Failed to update user" });
+  }
+});
+
+app.delete("/api/users/:id", requireAuth, requireRole(['admin']), async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    
+    // Don't allow deleting own account
+    if (id === req.session.user?.id) {
+      return res.status(400).json({ message: "No puedes eliminar tu propia cuenta" });
+    }
+    
+    await storage.deleteUser(id);
+    res.status(204).send();
+  } catch (error) {
+    console.error("Error deleting user:", error);
+    res.status(500).json({ message: "Failed to delete user" });
+  }
+});
+
+app.put("/api/users/:id/password", requireAuth, requireRole(['admin']), async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { password } = req.body;
+    
+    if (!password || password.length < 6) {
+      return res.status(400).json({ message: "La contraseña debe tener al menos 6 caracteres" });
+    }
+    
+    await storage.updateUserPassword(id, password);
+    res.json({ message: "Contraseña actualizada correctamente" });
+  } catch (error) {
+    console.error("Error updating password:", error);
+    res.status(500).json({ message: "Failed to update password" });
+  }
+});
+
+app.put("/api/users/:id/toggle-status", requireAuth, requireRole(['admin']), async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    
+    // Don't allow disabling own account
+    if (id === req.session.user?.id) {
+      return res.status(400).json({ message: "No puedes desactivar tu propia cuenta" });
+    }
+    
+    const user = await storage.toggleUserStatus(id);
+    // Remove password from response
+    const { password, ...safeUser } = user;
+    res.json(safeUser);
+  } catch (error) {
+    console.error("Error toggling user status:", error);
+    res.status(500).json({ message: "Failed to toggle user status" });
+  }
+});
 
   const httpServer = createServer(app);
   return httpServer;

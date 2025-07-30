@@ -1,186 +1,235 @@
-import { Link, useLocation } from "wouter";
-import { Button } from "@/components/ui/button";
+import React from "react";
+import { Link, useRoute } from "wouter";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
 import {
-  Home,
+  BarChart3,
   Package,
   ShoppingCart,
   ShoppingBag,
-  BarChart3,
+  FileText,
   Settings,
-  Menu,
-  X,
+  Users,
   LogOut,
-  User
+  Home,
+  TrendingUp
 } from "lucide-react";
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { type CompanySettings } from "@shared/schema";
+
+interface NavigationItem {
+  title: string;
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  badge?: string;
+  requiresRole?: string[];
+  description?: string;
+}
+
+const navigationItems: NavigationItem[] = [
+  {
+    title: "Dashboard",
+    href: "/",
+    icon: Home,
+    description: "Panel principal del sistema"
+  },
+  {
+    title: "Inventario",
+    href: "/inventario",
+    icon: Package,
+    description: "Gestión de productos y stock"
+  },
+  {
+    title: "Ventas",
+    href: "/ventas",
+    icon: ShoppingCart,
+    requiresRole: ["admin", "sales"],
+    description: "Registro y seguimiento de ventas"
+  },
+  {
+    title: "Compras",
+    href: "/compras",
+    icon: ShoppingBag,
+    requiresRole: ["admin"],
+    description: "Gestión de compras a proveedores"
+  },
+  {
+    title: "Reportes",
+    href: "/reportes",
+    icon: TrendingUp,
+    requiresRole: ["admin"],
+    description: "Análisis y reportes del negocio"
+  },
+  {
+    title: "Usuarios",
+    href: "/usuarios",
+    icon: Users,
+    requiresRole: ["admin"],
+    description: "Gestión de usuarios del sistema"
+  },
+  {
+    title: "Configuración",
+    href: "/configuracion",
+    icon: Settings,
+    requiresRole: ["admin"],
+    description: "Configuración del sistema"
+  }
+];
 
 interface SidebarNavigationProps {
   className?: string;
 }
 
-const getAllNavigationItems = () => [
-  { href: "/", label: "Inicio", icon: Home, color: "text-blue-600", roles: ['admin', 'sales', 'viewer'] },
-  { href: "/inventario", label: "Inventario", icon: Package, color: "text-purple-600", roles: ['admin', 'sales', 'viewer'] },
-  { href: "/ventas", label: "Ventas", icon: ShoppingCart, color: "text-green-600", roles: ['admin', 'sales'] },
-  { href: "/compras", label: "Compras", icon: ShoppingBag, color: "text-orange-600", roles: ['admin'] },
-  { href: "/reportes", label: "Reportes", icon: BarChart3, color: "text-indigo-600", roles: ['admin'] },
-  { href: "/configuracion", label: "Configuración", icon: Settings, color: "text-gray-600", roles: ['admin'] },
-];
-
 export default function SidebarNavigation({ className }: SidebarNavigationProps) {
-  const [location] = useLocation();
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const { user, logout } = useAuth();
-
-  // Obtener configuración de la empresa
-  const { data: companySettings } = useQuery<CompanySettings>({
-    queryKey: ["/api/company-settings"],
-  });
+  const { user, logout, hasRole } = useAuth();
+  const [match] = useRoute("/:path*");
 
   const handleLogout = async () => {
     try {
       await logout();
-      window.location.reload();
     } catch (error) {
-      console.error("Error during logout:", error);
+      console.error("Error al cerrar sesión:", error);
     }
   };
 
-  const getRoleDisplayName = (role: string): string => {
-    const roleNames = {
-      admin: "Administrador",
-      sales: "Ventas", 
-      viewer: "Visor"
-    };
-    return roleNames[role as keyof typeof roleNames] || role;
+  const filteredItems = navigationItems.filter((item) => {
+    if (!item.requiresRole) return true;
+    return hasRole(item.requiresRole as any);
+  });
+
+  const getRoleLabel = (role: string) => {
+    switch (role) {
+      case "admin": return "Administrador";
+      case "sales": return "Ventas";
+      case "viewer": return "Visor";
+      default: return role;
+    }
   };
 
-  // Filter navigation items based on user role
-  const getVisibleNavigationItems = () => {
-    if (!user) return [];
-    return getAllNavigationItems().filter(item => 
-      item.roles.includes(user.role as any)
-    );
+  const getRoleBadgeVariant = (role: string) => {
+    switch (role) {
+      case "admin": return "default";
+      case "sales": return "secondary";
+      case "viewer": return "outline";
+      default: return "outline";
+    }
   };
 
   return (
-    <>
-      {/* Mobile Menu Button */}
-      <div className="lg:hidden fixed top-4 left-4 z-50">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="bg-white shadow-lg"
-        >
-          {isMobileMenuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
-        </Button>
+    <div className={cn("flex h-full w-64 flex-col bg-white border-r border-gray-200", className)}>
+      {/* Header */}
+      <div className="flex h-16 items-center border-b border-gray-200 px-6">
+        <div className="flex items-center space-x-3">
+          <div className="h-8 w-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
+            <BarChart3 className="h-5 w-5 text-white" />
+          </div>
+          <div>
+            <h1 className="text-lg font-bold text-gray-900">AutoParts</h1>
+            <p className="text-xs text-gray-500">Sistema de Gestión</p>
+          </div>
+        </div>
       </div>
 
-      {/* Sidebar */}
-      <aside
-        className={cn(
-          "fixed left-0 top-0 z-40 h-screen w-64 transform bg-white shadow-lg transition-transform duration-300 ease-in-out lg:translate-x-0",
-          isMobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
-          className
-        )}
-      >
-        <div className="flex h-full flex-col">
-          {/* Header */}
-          <div className="border-b border-gray-200 p-6">
-            <div className="flex items-center space-x-3">
-              <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-                <Package className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <h1 className="text-lg font-bold text-gray-900">
-                  {companySettings?.name || 'AutoParts'}
-                </h1>
-                <p className="text-sm text-gray-500">Gestión Empresarial</p>
-              </div>
+      {/* User Info */}
+      {user && (
+        <div className="border-b border-gray-200 p-4">
+          <div className="flex items-center space-x-3">
+            <div className="h-10 w-10 bg-blue-100 rounded-full flex items-center justify-center">
+              <span className="text-blue-600 font-medium text-sm">
+                {user.fullName.split(' ').map(n => n[0]).join('').toUpperCase()}
+              </span>
             </div>
-          </div>
-
-          {/* Navigation */}
-          <nav className="flex-1 space-y-2 p-4">
-            {getVisibleNavigationItems().map((item) => {
-              const isActive = location === item.href;
-              const Icon = item.icon;
-              
-              return (
-                <Link key={item.href} href={item.href}>
-                  <Button
-                    variant={isActive ? "default" : "ghost"}
-                    className={cn(
-                      "w-full justify-start space-x-3 transition-all duration-200",
-                      isActive 
-                        ? "bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg" 
-                        : "hover:bg-gray-50 text-gray-700 hover:text-gray-900"
-                    )}
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    <Icon 
-                      className={cn(
-                        "h-5 w-5",
-                        isActive ? "text-white" : item.color
-                      )} 
-                    />
-                    <span className="font-medium">{item.label}</span>
-                  </Button>
-                </Link>
-              );
-            })}
-          </nav>
-
-          {/* User Info & Logout */}
-          <div className="border-t border-gray-200 p-4 space-y-3">
-            {user && (
-              <div className="flex items-center space-x-3 mb-3">
-                <div className="flex-shrink-0">
-                  <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                    <User className="w-4 h-4 text-blue-600" />
-                  </div>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 truncate">
-                    {user.fullName}
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    {getRoleDisplayName(user.role)}
-                  </p>
-                </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-gray-900 truncate">
+                {user.fullName}
+              </p>
+              <div className="flex items-center space-x-2">
+                <p className="text-xs text-gray-500">@{user.username}</p>
+                <Badge 
+                  variant={getRoleBadgeVariant(user.role) as any}
+                  className="text-xs"
+                >
+                  {getRoleLabel(user.role)}
+                </Badge>
               </div>
-            )}
-            
-            <Button
-              onClick={handleLogout}
-              variant="outline"
-              size="sm"
-              className="w-full justify-start space-x-2 text-red-600 border-red-200 hover:bg-red-50"
-            >
-              <LogOut className="w-4 h-4" />
-              <span>Cerrar Sesión</span>
-            </Button>
-            
-            <div className="text-center pt-2">
-              <p className="text-xs text-gray-500">v1.0.0</p>
-              <p className="text-xs text-gray-400">Sistema de Gestión</p>
             </div>
           </div>
         </div>
-      </aside>
-
-      {/* Mobile Overlay */}
-      {isMobileMenuOpen && (
-        <div
-          className="fixed inset-0 z-30 bg-black bg-opacity-50 lg:hidden"
-          onClick={() => setIsMobileMenuOpen(false)}
-        />
       )}
-    </>
+
+      {/* Navigation */}
+      <ScrollArea className="flex-1 px-3 py-4">
+        <nav className="space-y-1">
+          <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-3 py-2">
+            Navegación Principal
+          </div>
+          
+          {filteredItems.map((item) => {
+            const isActive = item.href === "/" 
+              ? window.location.pathname === "/" 
+              : window.location.pathname.startsWith(item.href);
+            
+            return (
+              <Link key={item.href} href={item.href}>
+                <Button
+                  variant={isActive ? "secondary" : "ghost"}
+                  className={cn(
+                    "w-full justify-start h-auto p-3 text-left",
+                    isActive 
+                      ? "bg-blue-50 text-blue-700 border border-blue-200" 
+                      : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
+                  )}
+                >
+                  <item.icon 
+                    className={cn(
+                      "mr-3 h-5 w-5 flex-shrink-0",
+                      isActive ? "text-blue-600" : "text-gray-500"
+                    )} 
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium truncate">{item.title}</span>
+                      {item.badge && (
+                        <Badge variant="secondary" className="ml-2 text-xs">
+                          {item.badge}
+                        </Badge>
+                      )}
+                    </div>
+                    {item.description && (
+                      <p className="text-xs text-gray-500 mt-0.5 truncate">
+                        {item.description}
+                      </p>
+                    )}
+                  </div>
+                </Button>
+              </Link>
+            );
+          })}
+        </nav>
+      </ScrollArea>
+
+      {/* Footer */}
+      <div className="border-t border-gray-200 p-4">
+        <Button
+          variant="ghost"
+          onClick={handleLogout}
+          className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50"
+        >
+          <LogOut className="mr-3 h-5 w-5" />
+          Cerrar Sesión
+        </Button>
+        
+        <div className="mt-3 pt-3 border-t border-gray-100">
+          <p className="text-xs text-gray-500 text-center">
+            © 2025 AutoParts System
+          </p>
+          <p className="text-xs text-gray-400 text-center">
+            v1.0.0
+          </p>
+        </div>
+      </div>
+    </div>
   );
 }

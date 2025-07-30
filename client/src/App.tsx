@@ -14,6 +14,7 @@ import SalesPage from "@/pages/sales";
 import PurchasesPage from "@/pages/purchases";
 import ReportsPage from "@/pages/reports";
 import SettingsPage from "@/pages/settings";
+import UsersPage from "@/pages/users";
 import NotFound from "@/pages/not-found";
 
 function AuthenticatedRouter() {
@@ -56,6 +57,11 @@ function AuthenticatedRouter() {
         <Route path="/reportes">
           <ProtectedRoute requiredRoles={['admin']}>
             <ReportsPage />
+          </ProtectedRoute>
+        </Route>
+        <Route path="/usuarios">
+          <ProtectedRoute requiredRoles={['admin']}>
+            <UsersPage />
           </ProtectedRoute>
         </Route>
         <Route path="/configuracion">
