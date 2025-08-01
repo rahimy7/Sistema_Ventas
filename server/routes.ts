@@ -335,23 +335,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Enhanced purchase endpoint for multiple items
-  app.post("/api/purchases/enhanced", requireAuth, requireRole(['admin']), async (req, res) => {
-    try {
-      const { purchaseDate, ...purchaseData } = req.body;
-      
-      // Convert purchaseDate string to Date if necessary
-      const processedData = {
-        ...purchaseData,
-        purchaseDate: purchaseDate ? new Date(purchaseDate) : new Date(),
-      };
+app.post("/api/purchases/enhanced", requireAuth, requireRole(['admin']), async (req, res) => {
+  try {
+    const { purchaseDate, ...purchaseData } = req.body;
+    
+    // Convert purchaseDate string to Date if necessary
+    const processedData = {
+      ...purchaseData,
+      purchaseDate: purchaseDate ? new Date(purchaseDate) : new Date(),
+    };
 
-      const purchase = await storage.createEnhancedPurchase(processedData);
-      res.status(201).json(purchase);
-    } catch (error) {
-      console.error("Error creating enhanced purchase:", error);
-      res.status(500).json({ message: "Failed to create enhanced purchase" });
+    console.log("Processing enhanced purchase:", processedData);
+
+    const purchase = await storage.createEnhancedPurchase(processedData);
+    
+    // Asegurar que se retorna JSON válido
+    res.status(201).json({
+      success: true,
+      message: "Compra registrada exitosamente",
+      purchase: purchase,
+      id: purchase.id
+    });
+    
+  } catch (error) {
+    console.error("Error creating enhanced purchase:", error);
+    
+    // Manejar diferentes tipos de errores
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ 
+        success: false,
+        message: "Datos inválidos", 
+        errors: error.errors 
+      });
     }
-  });
+    
+    if (error instanceof Error) {
+      return res.status(500).json({ 
+        success: false,
+        message: error.message || "Error interno del servidor"
+      });
+    }
+    
+    return res.status(500).json({ 
+      success: false,
+      message: "Error desconocido al procesar la compra"
+    });
+  }
+});
 
   // Inventory routes - all roles can view, admin can modify
   app.get("/api/inventory", requireAuth, async (req, res) => {

@@ -280,6 +280,7 @@ async updateAssetStatus(id: number, status: AssetStatus): Promise<Asset> {
 }
 
 // Enhanced purchase creation with product types - ACTUALIZADO
+
 async createEnhancedPurchase(purchaseData: {
   purchaseDate: Date;
   supplier: string;
@@ -294,136 +295,178 @@ async createEnhancedPurchase(purchaseData: {
     unitPrice: string;
     totalAmount: string;
     category: string;
-    productType: ProductType; // NUEVO
+    productType: ProductType;
     inventoryId?: number;
     isNewProduct: boolean;
     salePrice?: string;
     reorderPoint?: string;
-    // Campos para activos - NUEVO
+    // Campos para activos
     usefulLife?: string;
     depreciationRate?: string;
     serialNumber?: string;
     location?: string;
   }>;
 }): Promise<Purchase> {
-  return await db.transaction(async (tx) => {
-    // Create the purchase header
-    const [purchase] = await tx.insert(purchases).values({
-      purchaseDate: purchaseData.purchaseDate,
-      supplier: purchaseData.supplier,
-      totalAmount: purchaseData.totalAmount,
-      paymentMethod: purchaseData.paymentMethod,
-      invoiceNumber: purchaseData.invoiceNumber,
-      notes: purchaseData.notes,
-    }).returning();
+  console.log("Storage: Creating enhanced purchase:", purchaseData);
+  
+  try {
+    return await db.transaction(async (tx) => {
+      console.log("Storage: Starting transaction");
+      
+      // Create the purchase header
+      const [purchase] = await tx.insert(purchases).values({
+        purchaseDate: purchaseData.purchaseDate,
+        supplier: purchaseData.supplier,
+        totalAmount: purchaseData.totalAmount,
+        paymentMethod: purchaseData.paymentMethod,
+        invoiceNumber: purchaseData.invoiceNumber,
+        notes: purchaseData.notes,
+      }).returning();
 
-    // Process each item based on product type
-    for (const item of purchaseData.items) {
-      let inventoryId = item.inventoryId;
-      let assetId: number | undefined = undefined;
+      console.log("Storage: Purchase header created:", purchase.id);
 
-      if (item.productType === 'inventory') {
-        // Handle inventory products (for sale)
-        if (item.isNewProduct) {
-          // Create new inventory item
-          const [newInventoryItem] = await tx.insert(inventory).values({
-            productName: item.product,
-            unit: item.unit,
-            purchasePrice: item.unitPrice,
-            salePrice: item.salePrice || item.unitPrice,
-            initialStock: item.quantity,
-            currentStock: item.quantity,
-            reorderPoint: item.reorderPoint || "0",
-          }).returning();
-          inventoryId = newInventoryItem.id;
+      // Process each item based on product type
+      for (let index = 0; index < purchaseData.items.length; index++) {
+        const item = purchaseData.items[index];
+        console.log(`Storage: Processing item ${index + 1}:`, item.product, item.productType);
+        
+        let inventoryId = item.inventoryId;
+        let assetId: number | undefined = undefined;
 
-          // Log initial stock movement
-          await tx.insert(stockMovements).values({
-            inventoryId: newInventoryItem.id,
-            movementType: "in",
-            quantity: item.quantity,
-            previousStock: "0",
-            newStock: item.quantity,
-            reason: "Compra inicial - producto nuevo",
-            reference: `Compra #${purchase.id}`,
-            createdBy: "system",
-          });
-        } else if (inventoryId) {
-          // Update existing inventory stock
-          const [currentItem] = await tx.select().from(inventory).where(eq(inventory.id, inventoryId));
-          if (currentItem) {
-            const previousStock = Number(currentItem.currentStock);
-            const addedQuantity = Number(item.quantity);
-            const newStock = previousStock + addedQuantity;
+        try {
+          if (item.productType === 'inventory') {
+            // Handle inventory products (for sale)
+            if (item.isNewProduct) {
+              console.log("Storage: Creating new inventory item");
+              
+              // Create new inventory item
+              const [newInventoryItem] = await tx.insert(inventory).values({
+                productName: item.product,
+                unit: item.unit,
+                purchasePrice: item.unitPrice,
+                salePrice: item.salePrice || item.unitPrice,
+                initialStock: item.quantity,
+                currentStock: item.quantity,
+                reorderPoint: item.reorderPoint || "0",
+              }).returning();
+              
+              inventoryId = newInventoryItem.id;
+              console.log("Storage: New inventory item created:", inventoryId);
 
-            await tx.update(inventory)
-              .set({ 
-                currentStock: newStock.toString(),
-                updatedAt: new Date(),
-              })
-              .where(eq(inventory.id, inventoryId));
+              // Log initial stock movement
+              await tx.insert(stockMovements).values({
+                inventoryId: newInventoryItem.id,
+                movementType: "in",
+                quantity: item.quantity,
+                previousStock: "0",
+                newStock: item.quantity,
+                reason: "Compra inicial - producto nuevo",
+                reference: `Compra #${purchase.id}`,
+                createdBy: "system",
+              });
+              
+            } else if (inventoryId) {
+              console.log("Storage: Updating existing inventory");
+              
+              // Update existing inventory stock
+              const [currentItem] = await tx.select().from(inventory).where(eq(inventory.id, inventoryId));
+              if (currentItem) {
+                const previousStock = Number(currentItem.currentStock);
+                const addedQuantity = Number(item.quantity);
+                const newStock = previousStock + addedQuantity;
 
-            // Log stock movement
-            await tx.insert(stockMovements).values({
-              inventoryId,
-              movementType: "in",
-              quantity: item.quantity,
-              previousStock: previousStock.toString(),
-              newStock: newStock.toString(),
-              reason: "Compra de inventario",
-              reference: `Compra #${purchase.id}`,
-              createdBy: "system",
+                await tx.update(inventory)
+                  .set({ 
+                    currentStock: newStock.toString(),
+                    updatedAt: new Date(),
+                  })
+                  .where(eq(inventory.id, inventoryId));
+
+                // Log stock movement
+                await tx.insert(stockMovements).values({
+                  inventoryId,
+                  movementType: "in",
+                  quantity: item.quantity,
+                  previousStock: previousStock.toString(),
+                  newStock: newStock.toString(),
+                  reason: "Compra de inventario",
+                  reference: `Compra #${purchase.id}`,
+                  createdBy: "system",
+                });
+              }
+            }
+            
+          } else if (item.productType === 'asset') {
+            console.log("Storage: Creating new asset");
+            
+            // Handle assets
+            const [newAsset] = await tx.insert(assets).values({
+              assetName: item.product,
+              category: item.category,
+              purchaseDate: purchaseData.purchaseDate,
+              purchasePrice: item.unitPrice,
+              currentValue: item.unitPrice, // Initially same as purchase price
+              depreciationRate: item.depreciationRate || "20",
+              usefulLife: item.usefulLife ? parseInt(item.usefulLife) : 5,
+              supplier: purchaseData.supplier,
+              serialNumber: item.serialNumber,
+              location: item.location,
+              status: 'active',
+              notes: `Adquirido mediante compra #${purchase.id}`,
+            }).returning();
+            
+            assetId = newAsset.id;
+            console.log("Storage: New asset created:", assetId);
+            
+          } else if (item.productType === 'supply') {
+            console.log("Storage: Creating expense for supply");
+            
+            // Handle supplies (create expense record)
+            await tx.insert(expenses).values({
+              date: purchaseData.purchaseDate,
+              category: `Insumos - ${item.category}`,
+              description: `${item.product} - ${item.quantity} ${item.unit}`,
+              amount: item.totalAmount,
+              paymentMethod: purchaseData.paymentMethod,
+              receipt: `Compra #${purchase.id}`,
             });
           }
+
+          // Create purchase item record
+          console.log("Storage: Creating purchase item record");
+          await tx.insert(purchaseItems).values({
+            purchaseId: purchase.id,
+            product: item.product,
+            unit: item.unit,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            totalAmount: item.totalAmount,
+            category: item.category,
+            productType: item.productType,
+            inventoryId,
+            assetId,
+          });
+          
+        } catch (itemError) {
+          console.error(`Storage: Error processing item ${index + 1}:`, itemError);
+          throw new Error(`Error procesando el producto "${item.product}": ${itemError instanceof Error ? itemError.message : 'Error desconocido'}`);
         }
-      } else if (item.productType === 'asset') {
-        // Handle assets
-        const [newAsset] = await tx.insert(assets).values({
-          assetName: item.product,
-          category: item.category,
-          purchaseDate: purchaseData.purchaseDate,
-          purchasePrice: item.unitPrice,
-          currentValue: item.unitPrice, // Initially same as purchase price
-          depreciationRate: item.depreciationRate || "20",
-          usefulLife: item.usefulLife ? parseInt(item.usefulLife) : 5,
-          supplier: purchaseData.supplier,
-          serialNumber: item.serialNumber,
-          location: item.location,
-          status: 'active',
-          notes: `Adquirido mediante compra #${purchase.id}`,
-        }).returning();
-        assetId = newAsset.id;
-      } else if (item.productType === 'supply') {
-        // Handle supplies (create expense record)
-        await tx.insert(expenses).values({
-          date: purchaseData.purchaseDate,
-          category: `Insumos - ${item.category}`,
-          description: `${item.product} - ${item.quantity} ${item.unit}`,
-          amount: item.totalAmount,
-          paymentMethod: purchaseData.paymentMethod,
-          receipt: `Compra #${purchase.id}`,
-        });
       }
 
-      // Create purchase item record
-      await tx.insert(purchaseItems).values({
-        purchaseId: purchase.id,
-        product: item.product,
-        unit: item.unit,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        totalAmount: item.totalAmount,
-        category: item.category,
-        productType: item.productType,
-        inventoryId,
-        assetId,
-      });
+      console.log("Storage: Transaction completed successfully");
+      return purchase;
+    });
+    
+  } catch (error) {
+    console.error("Storage: Enhanced purchase creation failed:", error);
+    
+    if (error instanceof Error) {
+      throw new Error(`Error en la creación de compra: ${error.message}`);
+    } else {
+      throw new Error("Error desconocido al crear la compra en la base de datos");
     }
-
-    return purchase;
-  });
+  }
 }
-
 
   async updatePurchase(id: number, purchase: Partial<InsertPurchase>): Promise<Purchase> {
     const [updatedPurchase] = await db
