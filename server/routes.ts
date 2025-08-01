@@ -4,7 +4,7 @@ import { storage } from "./storage.js";
 import session from "express-session";
 import ConnectPgSimple from "connect-pg-simple";
 import { pool } from "./db.js";
-import { loginSchema, type User, type LoginCredentials, insertUserSchema } from "../shared/schema.js";
+import { loginSchema, type User, type LoginCredentials, insertUserSchema, insertAssetSchema } from "../shared/schema.js";
 import {
   insertIncomeSchema,
   insertExpenseSchema,
@@ -873,6 +873,108 @@ app.put("/api/users/:id/password", requireAuth, requireRole(['admin']), async (r
   }
 });
 
+// Asset routes - admin only
+app.get("/api/assets", requireAuth, requireRole(['admin']), async (req, res) => {
+  try {
+    const assets = await storage.getAssets();
+    res.json(assets);
+  } catch (error) {
+    console.error("Error fetching assets:", error);
+    res.status(500).json({ message: "Failed to fetch assets" });
+  }
+});
+
+app.get("/api/assets/:id", requireAuth, requireRole(['admin']), async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const asset = await storage.getAssetById(id);
+    if (!asset) {
+      return res.status(404).json({ message: "Asset not found" });
+    }
+    res.json(asset);
+  } catch (error) {
+    console.error("Error fetching asset:", error);
+    res.status(500).json({ message: "Failed to fetch asset" });
+  }
+});
+
+app.post("/api/assets", requireAuth, requireRole(['admin']), async (req, res) => {
+  try {
+    const data = insertAssetSchema.parse(req.body);
+    const asset = await storage.createAsset(data);
+    res.status(201).json(asset);
+  } catch (error) {
+    console.error("Error creating asset:", error);
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ message: "Invalid data", errors: error.errors });
+    }
+    res.status(500).json({ message: "Failed to create asset" });
+  }
+});
+
+app.put("/api/assets/:id", requireAuth, requireRole(['admin']), async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const data = insertAssetSchema.partial().parse(req.body);
+    const asset = await storage.updateAsset(id, data);
+    res.json(asset);
+  } catch (error) {
+    console.error("Error updating asset:", error);
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ message: "Invalid data", errors: error.errors });
+    }
+    res.status(500).json({ message: "Failed to update asset" });
+  }
+});
+
+app.put("/api/assets/:id/status", requireAuth, requireRole(['admin']), async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { status } = req.body;
+    const asset = await storage.updateAssetStatus(id, status);
+    res.json(asset);
+  } catch (error) {
+    console.error("Error updating asset status:", error);
+    res.status(500).json({ message: "Failed to update asset status" });
+  }
+});
+
+app.delete("/api/assets/:id", requireAuth, requireRole(['admin']), async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    await storage.deleteAsset(id);
+    res.status(204).send();
+  } catch (error) {
+    console.error("Error deleting asset:", error);
+    res.status(500).json({ message: "Failed to delete asset" });
+  }
+});
+
+// Asset statistics
+app.get("/api/assets/stats", requireAuth, requireRole(['admin']), async (req, res) => {
+  try {
+    const assets = await storage.getAssets();
+    
+    const stats = {
+      totalAssets: assets.length,
+      totalValue: assets.reduce((sum, asset) => sum + Number(asset.currentValue), 0),
+      activeAssets: assets.filter(a => a.status === 'active').length,
+      depreciatedAssets: assets.filter(a => a.status === 'depreciated').length,
+      maintenanceAssets: assets.filter(a => a.status === 'maintenance').length,
+      disposedAssets: assets.filter(a => a.status === 'disposed').length,
+      byCategory: assets.reduce((acc, asset) => {
+        acc[asset.category] = (acc[asset.category] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>),
+    };
+    
+    res.json(stats);
+  } catch (error) {
+    console.error("Error fetching asset statistics:", error);
+    res.status(500).json({ message: "Failed to fetch asset statistics" });
+  }
+});
+
 app.put("/api/users/:id/toggle-status", requireAuth, requireRole(['admin']), async (req, res) => {
   try {
     const id = parseInt(req.params.id);
@@ -895,3 +997,4 @@ app.put("/api/users/:id/toggle-status", requireAuth, requireRole(['admin']), asy
   const httpServer = createServer(app);
   return httpServer;
 }
+

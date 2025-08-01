@@ -6,11 +6,17 @@ import { z } from "zod";
 // User roles enum
 export const userRoleEnum = pgEnum('user_role', ['admin', 'sales', 'viewer']);
 
+// Product type enum - Nuevo
+export const productTypeEnum = pgEnum('product_type', ['inventory', 'supply', 'asset']);
+
+// Asset status enum - Nuevo
+export const assetStatusEnum = pgEnum('asset_status', ['active', 'depreciated', 'disposed', 'maintenance']);
+
 // Users table for authentication
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: varchar("username", { length: 50 }).notNull().unique(),
-  password: text("password").notNull(), // Will store hashed password
+  password: text("password").notNull(),
   fullName: text("full_name").notNull(),
   role: userRoleEnum("role").notNull().default('viewer'),
   isActive: boolean("is_active").default(true),
@@ -58,7 +64,7 @@ export const purchases = pgTable("purchases", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// Purchase items (details)
+// Purchase items (details) - Actualizado con productType
 export const purchaseItems = pgTable("purchase_items", {
   id: serial("id").primaryKey(),
   purchaseId: integer("purchase_id").references(() => purchases.id).notNull(),
@@ -68,11 +74,13 @@ export const purchaseItems = pgTable("purchase_items", {
   unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
   totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull(),
   category: varchar("category", { length: 100 }).notNull(),
-  inventoryId: integer("inventory_id").references(() => inventory.id), // Link to inventory if existing product
+  productType: productTypeEnum("product_type").notNull().default('inventory'), // Nuevo campo
+  inventoryId: integer("inventory_id").references(() => inventory.id), // Solo para productos de inventario
+  assetId: integer("asset_id").references(() => assets.id), // Solo para activos
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Inventory management
+// Inventory management - Solo para productos de venta
 export const inventory = pgTable("inventory", {
   id: serial("id").primaryKey(),
   productName: text("product_name").notNull(),
@@ -82,6 +90,26 @@ export const inventory = pgTable("inventory", {
   initialStock: decimal("initial_stock", { precision: 10, scale: 2 }).notNull(),
   currentStock: decimal("current_stock", { precision: 10, scale: 2 }).notNull(),
   reorderPoint: decimal("reorder_point", { precision: 10, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Nueva tabla de activos
+export const assets = pgTable("assets", {
+  id: serial("id").primaryKey(),
+  assetName: text("asset_name").notNull(),
+  category: varchar("category", { length: 100 }).notNull(),
+  purchaseDate: timestamp("purchase_date").notNull(),
+  purchasePrice: decimal("purchase_price", { precision: 10, scale: 2 }).notNull(),
+  currentValue: decimal("current_value", { precision: 10, scale: 2 }).notNull(),
+  depreciationRate: decimal("depreciation_rate", { precision: 5, scale: 2 }).default("0"), // Porcentaje anual
+  usefulLife: integer("useful_life"), // Años de vida útil
+  supplier: text("supplier"),
+  serialNumber: varchar("serial_number", { length: 100 }),
+  location: text("location"),
+  status: assetStatusEnum("status").notNull().default('active'),
+  maintenanceSchedule: text("maintenance_schedule"),
+  notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -129,13 +157,13 @@ export const invoices = pgTable("invoices", {
   discountRate: decimal("discount_rate", { precision: 5, scale: 2 }).default("0"),
   discountAmount: decimal("discount_amount", { precision: 10, scale: 2 }).default("0"),
   total: decimal("total", { precision: 10, scale: 2 }).notNull(),
-  status: varchar("status", { length: 20 }).notNull().default("pending"), // pending, paid, overdue, cancelled
+  status: varchar("status", { length: 20 }).notNull().default("pending"),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// Invoice Items (Elementos de la factura)
+// Invoice Items
 export const invoiceItems = pgTable("invoice_items", {
   id: serial("id").primaryKey(),
   invoiceId: integer("invoice_id").references(() => invoices.id),
@@ -147,16 +175,16 @@ export const invoiceItems = pgTable("invoice_items", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Stock movements tracking
+// Stock movements tracking - Solo para productos de inventario
 export const stockMovements = pgTable("stock_movements", {
   id: serial("id").primaryKey(),
   inventoryId: integer("inventory_id").references(() => inventory.id).notNull(),
-  movementType: varchar("movement_type", { length: 20 }).notNull(), // "in", "out", "adjustment"
+  movementType: varchar("movement_type", { length: 20 }).notNull(),
   quantity: decimal("quantity", { precision: 10, scale: 2 }).notNull(),
   previousStock: decimal("previous_stock", { precision: 10, scale: 2 }).notNull(),
   newStock: decimal("new_stock", { precision: 10, scale: 2 }).notNull(),
   reason: text("reason").notNull(),
-  reference: text("reference"), // purchase order, sale order, adjustment note
+  reference: text("reference"),
   createdAt: timestamp("created_at").defaultNow(),
   createdBy: text("created_by").default("system"),
 });
@@ -175,8 +203,8 @@ export const sales = pgTable("sales", {
   taxAmount: decimal("tax_amount", { precision: 10, scale: 2 }).default("0"),
   discountAmount: decimal("discount_amount", { precision: 10, scale: 2 }).default("0"),
   total: decimal("total", { precision: 10, scale: 2 }).notNull(),
-  paymentMethod: varchar("payment_method", { length: 50 }).notNull(), // "cash", "card", "transfer", "credit"
-  status: varchar("status", { length: 20 }).notNull().default("completed"), // "pending", "completed", "cancelled"
+  paymentMethod: varchar("payment_method", { length: 50 }).notNull(),
+  status: varchar("status", { length: 20 }).notNull().default("completed"),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -192,6 +220,20 @@ export const saleItems = pgTable("sale_items", {
   unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
   subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Company settings table
+export const companySettings = pgTable("company_settings", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  address: text("address").notNull(),
+  phone: text("phone").notNull(),
+  email: text("email").notNull(),
+  website: text("website"),
+  taxId: text("tax_id"),
+  logo: text("logo"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 // Relations
@@ -243,7 +285,27 @@ export const saleItemsRelations = relations(saleItems, ({ one }) => ({
   }),
 }));
 
-// Insert schemas
+// Nuevas relaciones para activos
+export const purchaseItemsRelations = relations(purchaseItems, ({ one }) => ({
+  purchase: one(purchases, {
+    fields: [purchaseItems.purchaseId],
+    references: [purchases.id],
+  }),
+  inventory: one(inventory, {
+    fields: [purchaseItems.inventoryId],
+    references: [inventory.id],
+  }),
+  asset: one(assets, {
+    fields: [purchaseItems.assetId],
+    references: [assets.id],
+  }),
+}));
+
+export const assetsRelations = relations(assets, ({ many }) => ({
+  purchaseItems: many(purchaseItems),
+}));
+
+// Insert schemas actualizados
 export const insertIncomeSchema = createInsertSchema(incomes).omit({
   id: true,
   createdAt: true,
@@ -261,7 +323,14 @@ export const insertPurchaseSchema = createInsertSchema(purchases).omit({
 
 export const insertInventorySchema = createInsertSchema(inventory).omit({
   id: true,
-  currentStock: true, // currentStock is automatically set to initialStock
+  currentStock: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Nuevo schema para activos
+export const insertAssetSchema = createInsertSchema(assets).omit({
+  id: true,
   createdAt: true,
   updatedAt: true,
 });
@@ -294,29 +363,15 @@ export const insertStockMovementSchema = createInsertSchema(stockMovements).omit
 
 export const insertSaleSchema = createInsertSchema(sales).omit({
   id: true,
-  saleNumber: true, // Se genera automáticamente
+  saleNumber: true,
   createdAt: true,
   updatedAt: true,
 });
 
 export const insertSaleItemSchema = createInsertSchema(saleItems).omit({
   id: true,
-  saleId: true, // Se asigna automáticamente
+  saleId: true,
   createdAt: true,
-});
-
-// Company settings table
-export const companySettings = pgTable("company_settings", {
-  id: serial("id").primaryKey(),
-  name: text("name").notNull(),
-  address: text("address").notNull(),
-  phone: text("phone").notNull(),
-  email: text("email").notNull(),
-  website: text("website"),
-  taxId: text("tax_id"),
-  logo: text("logo"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export const insertCompanySettingsSchema = createInsertSchema(companySettings).omit({
@@ -325,7 +380,24 @@ export const insertCompanySettingsSchema = createInsertSchema(companySettings).o
   updatedAt: true,
 });
 
-// Types
+export const insertUserSchema = createInsertSchema(users, {
+  username: z.string().min(3, "El usuario debe tener al menos 3 caracteres"),
+  password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
+  fullName: z.string().min(1, "El nombre completo es requerido"),
+}).omit({ id: true, createdAt: true, updatedAt: true, lastLogin: true });
+
+export const insertPurchaseItemSchema = createInsertSchema(purchaseItems).omit({
+  id: true,
+  createdAt: true,
+});
+
+// Nuevos tipos para activos
+export type Asset = typeof assets.$inferSelect;
+export type InsertAsset = z.infer<typeof insertAssetSchema>;
+export type ProductType = 'inventory' | 'supply' | 'asset';
+export type AssetStatus = 'active' | 'depreciated' | 'disposed' | 'maintenance';
+
+// Tipos existentes
 export type Income = typeof incomes.$inferSelect;
 export type InsertIncome = z.infer<typeof insertIncomeSchema>;
 
@@ -370,27 +442,17 @@ export type InventoryItemWithMovements = InventoryItem & {
 export type CompanySettings = typeof companySettings.$inferSelect;
 export type InsertCompanySettings = z.infer<typeof insertCompanySettingsSchema>;
 
+export type User = typeof users.$inferSelect;
+export type InsertUser = z.infer<typeof insertUserSchema>;
+export type UserRole = 'admin' | 'sales' | 'viewer';
+
+export type PurchaseItem = typeof purchaseItems.$inferSelect;
+export type InsertPurchaseItem = z.infer<typeof insertPurchaseItemSchema>;
+
 // Authentication schemas and types
 export const loginSchema = z.object({
   username: z.string().min(1, "El usuario es requerido"),
   password: z.string().min(1, "La contraseña es requerida"),
 });
 
-export const insertUserSchema = createInsertSchema(users, {
-  username: z.string().min(3, "El usuario debe tener al menos 3 caracteres"),
-  password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
-  fullName: z.string().min(1, "El nombre completo es requerido"),
-}).omit({ id: true, createdAt: true, updatedAt: true, lastLogin: true });
-
-export type User = typeof users.$inferSelect;
-export type InsertUser = z.infer<typeof insertUserSchema>;
 export type LoginCredentials = z.infer<typeof loginSchema>;
-export type UserRole = 'admin' | 'sales' | 'viewer';
-
-export const insertPurchaseItemSchema = createInsertSchema(purchaseItems).omit({
-  id: true,
-  createdAt: true,
-});
-
-export type PurchaseItem = typeof purchaseItems.$inferSelect;
-export type InsertPurchaseItem = z.infer<typeof insertPurchaseItemSchema>;

@@ -42,7 +42,12 @@ import {
   type User,
   type InsertUser,
   type LoginCredentials,
-  type UserRole
+  type UserRole,
+  assets,
+  Asset,
+  InsertAsset,
+  AssetStatus,
+  ProductType
 } from "../shared/schema.js";
 import { db } from "./db.js";
 import { eq, desc, sum, count, gte, lte, and, like } from "drizzle-orm";
@@ -238,44 +243,89 @@ export class DatabaseStorage implements IStorage {
     return newPurchase;
   }
 
-  // Enhanced purchase creation with multiple items
-  async createEnhancedPurchase(purchaseData: {
-    purchaseDate: Date;
-    supplier: string;
+  async getAssets(): Promise<Asset[]> {
+  return await db.select().from(assets).orderBy(desc(assets.purchaseDate));
+}
+
+async getAssetById(id: number): Promise<Asset | undefined> {
+  const [asset] = await db.select().from(assets).where(eq(assets.id, id));
+  return asset;
+}
+
+async createAsset(asset: InsertAsset): Promise<Asset> {
+  const [newAsset] = await db.insert(assets).values(asset).returning();
+  return newAsset;
+}
+
+async updateAsset(id: number, asset: Partial<InsertAsset>): Promise<Asset> {
+  const [updatedAsset] = await db
+    .update(assets)
+    .set({ ...asset, updatedAt: new Date() })
+    .where(eq(assets.id, id))
+    .returning();
+  return updatedAsset;
+}
+
+async deleteAsset(id: number): Promise<void> {
+  await db.delete(assets).where(eq(assets.id, id));
+}
+
+async updateAssetStatus(id: number, status: AssetStatus): Promise<Asset> {
+  const [updatedAsset] = await db
+    .update(assets)
+    .set({ status, updatedAt: new Date() })
+    .where(eq(assets.id, id))
+    .returning();
+  return updatedAsset;
+}
+
+// Enhanced purchase creation with product types - ACTUALIZADO
+async createEnhancedPurchase(purchaseData: {
+  purchaseDate: Date;
+  supplier: string;
+  totalAmount: string;
+  paymentMethod: string;
+  invoiceNumber?: string;
+  notes?: string;
+  items: Array<{
+    product: string;
+    unit: string;
+    quantity: string;
+    unitPrice: string;
     totalAmount: string;
-    paymentMethod: string;
-    invoiceNumber?: string;
-    notes?: string;
-    items: Array<{
-      product: string;
-      unit: string;
-      quantity: string;
-      unitPrice: string;
-      totalAmount: string;
-      category: string;
-      inventoryId?: number;
-      isNewProduct: boolean;
-      salePrice?: string;
-      reorderPoint?: string;
-    }>;
-  }): Promise<Purchase> {
-    return await db.transaction(async (tx) => {
-      // Create the purchase header
-      const [purchase] = await tx.insert(purchases).values({
-        purchaseDate: purchaseData.purchaseDate,
-        supplier: purchaseData.supplier,
-        totalAmount: purchaseData.totalAmount,
-        paymentMethod: purchaseData.paymentMethod,
-        invoiceNumber: purchaseData.invoiceNumber,
-        notes: purchaseData.notes,
-      }).returning();
+    category: string;
+    productType: ProductType; // NUEVO
+    inventoryId?: number;
+    isNewProduct: boolean;
+    salePrice?: string;
+    reorderPoint?: string;
+    // Campos para activos - NUEVO
+    usefulLife?: string;
+    depreciationRate?: string;
+    serialNumber?: string;
+    location?: string;
+  }>;
+}): Promise<Purchase> {
+  return await db.transaction(async (tx) => {
+    // Create the purchase header
+    const [purchase] = await tx.insert(purchases).values({
+      purchaseDate: purchaseData.purchaseDate,
+      supplier: purchaseData.supplier,
+      totalAmount: purchaseData.totalAmount,
+      paymentMethod: purchaseData.paymentMethod,
+      invoiceNumber: purchaseData.invoiceNumber,
+      notes: purchaseData.notes,
+    }).returning();
 
-      // Process each item
-      for (const item of purchaseData.items) {
-        let inventoryId = item.inventoryId;
+    // Process each item based on product type
+    for (const item of purchaseData.items) {
+      let inventoryId = item.inventoryId;
+      let assetId: number | undefined = undefined;
 
-        // If it's a new product, create inventory entry
+      if (item.productType === 'inventory') {
+        // Handle inventory products (for sale)
         if (item.isNewProduct) {
+          // Create new inventory item
           const [newInventoryItem] = await tx.insert(inventory).values({
             productName: item.product,
             unit: item.unit,
@@ -326,23 +376,54 @@ export class DatabaseStorage implements IStorage {
             });
           }
         }
-
-        // Create purchase item record
-        await tx.insert(purchaseItems).values({
-          purchaseId: purchase.id,
-          product: item.product,
-          unit: item.unit,
-          quantity: item.quantity,
-          unitPrice: item.unitPrice,
-          totalAmount: item.totalAmount,
+      } else if (item.productType === 'asset') {
+        // Handle assets
+        const [newAsset] = await tx.insert(assets).values({
+          assetName: item.product,
           category: item.category,
-          inventoryId,
+          purchaseDate: purchaseData.purchaseDate,
+          purchasePrice: item.unitPrice,
+          currentValue: item.unitPrice, // Initially same as purchase price
+          depreciationRate: item.depreciationRate || "20",
+          usefulLife: item.usefulLife ? parseInt(item.usefulLife) : 5,
+          supplier: purchaseData.supplier,
+          serialNumber: item.serialNumber,
+          location: item.location,
+          status: 'active',
+          notes: `Adquirido mediante compra #${purchase.id}`,
+        }).returning();
+        assetId = newAsset.id;
+      } else if (item.productType === 'supply') {
+        // Handle supplies (create expense record)
+        await tx.insert(expenses).values({
+          date: purchaseData.purchaseDate,
+          category: `Insumos - ${item.category}`,
+          description: `${item.product} - ${item.quantity} ${item.unit}`,
+          amount: item.totalAmount,
+          paymentMethod: purchaseData.paymentMethod,
+          receipt: `Compra #${purchase.id}`,
         });
       }
 
-      return purchase;
-    });
-  }
+      // Create purchase item record
+      await tx.insert(purchaseItems).values({
+        purchaseId: purchase.id,
+        product: item.product,
+        unit: item.unit,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        totalAmount: item.totalAmount,
+        category: item.category,
+        productType: item.productType,
+        inventoryId,
+        assetId,
+      });
+    }
+
+    return purchase;
+  });
+}
+
 
   async updatePurchase(id: number, purchase: Partial<InsertPurchase>): Promise<Purchase> {
     const [updatedPurchase] = await db

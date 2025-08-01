@@ -51,7 +51,11 @@ function AuthenticatedRouter() {
         </Route>
         <Route path="/compras">
           <ProtectedRoute requiredRoles={['admin']}>
-            <PurchasesPage />
+            <PurchasesPage onSuccess={function (): void {
+              throw new Error("Function not implemented.");
+            } } onCancel={function (): void {
+              throw new Error("Function not implemented.");
+            } } />
           </ProtectedRoute>
         </Route>
         <Route path="/reportes">
