@@ -19,24 +19,24 @@ import {
   CreditCard,
   Eye,
   FileText,
-  Printer
+  Printer,
+  Package
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { type Sale } from "@shared/schema";
+import { SaleItem, SaleWithItems, type Sale } from "@shared/schema";
 
 export default function SalesPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
+  const [selectedSale, setSelectedSale] = useState<SaleWithItems | null>(null);
   const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
-  const [saleForInvoice, setSaleForInvoice] = useState<Sale | null>(null);
+  const [saleForInvoice, setSaleForInvoice] = useState<SaleWithItems | null>(null);
 
-  // Cargar ventas
-  const { data: sales = [], isLoading: salesLoading } = useQuery<Sale[]>({
+  // Cargar ventas con items
+  const { data: sales = [], isLoading: salesLoading } = useQuery<SaleWithItems[]>({
     queryKey: ["/api/sales"],
   });
 
-  // Estadísticas de ventas
   const salesStats = {
     totalSales: sales.length,
     todaysSales: sales.filter(sale => {
@@ -280,6 +280,223 @@ export default function SalesPage() {
           sale={saleForInvoice}
         />
       )}
+// Agregar este código al final de tu archivo sales.tsx, antes del cierre del último div
+
+{/* Sale Detail Dialog */}
+{selectedSale && (
+  <Dialog open={!!selectedSale} onOpenChange={(open) => !open && setSelectedSale(null)}>
+    <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogHeader>
+        <DialogTitle className="text-xl font-semibold flex items-center gap-2">
+          <Eye className="h-5 w-5 text-blue-600" />
+          Detalles de la Venta #{selectedSale.saleNumber}
+        </DialogTitle>
+      </DialogHeader>
+
+      <div className="space-y-6">
+        {/* Información del Cliente */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <User className="h-5 w-5 text-green-600" />
+              Información del Cliente
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm font-medium text-gray-500">Nombre</p>
+                <p className="text-base font-semibold text-gray-900">{selectedSale.customerName}</p>
+              </div>
+              {selectedSale.customerEmail && (
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Email</p>
+                  <p className="text-base text-gray-900">{selectedSale.customerEmail}</p>
+                </div>
+              )}
+              {selectedSale.customerPhone && (
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Teléfono</p>
+                  <p className="text-base text-gray-900">{selectedSale.customerPhone}</p>
+                </div>
+              )}
+              {selectedSale.customerAddress && (
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Dirección</p>
+                  <p className="text-base text-gray-900">{selectedSale.customerAddress}</p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Información de la Venta */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <ShoppingCart className="h-5 w-5 text-blue-600" />
+              Información de la Venta
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <p className="text-sm font-medium text-gray-500">Fecha</p>
+                <p className="text-base font-semibold text-gray-900">
+                  {format(new Date(selectedSale.saleDate), "PPP", { locale: es })}
+                </p>
+                <p className="text-sm text-gray-600">
+                  {format(new Date(selectedSale.saleDate), "HH:mm")}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-500">Método de Pago</p>
+                <Badge variant="outline" className="mt-1">
+                  {getPaymentMethodText(selectedSale.paymentMethod)}
+                </Badge>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-500">Estado</p>
+                <Badge className={`mt-1 ${getStatusColor(selectedSale.status)}`}>
+                  {getStatusText(selectedSale.status)}
+                </Badge>
+              </div>
+            </div>
+            {selectedSale.notes && (
+              <div>
+                <p className="text-sm font-medium text-gray-500">Notas</p>
+                <p className="text-base text-gray-900 bg-gray-50 p-2 rounded">{selectedSale.notes}</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Productos Vendidos */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Package className="h-5 w-5 text-orange-600" />
+              Productos Vendidos
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {selectedSale.items?.length > 0 ? (
+              <div className="space-y-3">
+                {selectedSale.items.map((item: SaleItem, index: number) => (
+                  <div key={index} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                    <div className="flex-1">
+                      <p className="font-medium text-gray-900">{item.productName}</p>
+                      <p className="text-sm text-gray-600">
+                        {item.quantity} x ${Number(item.unitPrice).toLocaleString("es-ES", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2
+                        })}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-semibold text-gray-900">
+                        ${Number(item.subtotal).toLocaleString("es-ES", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2
+                        })}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-gray-500 text-center py-4">No hay productos registrados</p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Resumen de Totales */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <DollarSign className="h-5 w-5 text-green-600" />
+              Resumen de Totales
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600">Subtotal:</span>
+                <span className="font-medium">
+                  ${Number(selectedSale.subtotal).toLocaleString("es-ES", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                  })}
+                </span>
+              </div>
+
+              {Number(selectedSale.taxAmount) > 0 && (
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600">
+                    Impuestos ({Number(selectedSale.taxRate)}%):
+                  </span>
+                  <span className="font-medium">
+                    ${Number(selectedSale.taxAmount).toLocaleString("es-ES", {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2
+                    })}
+                  </span>
+                </div>
+              )}
+
+              {Number(selectedSale.discountAmount) > 0 && (
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600">Descuento:</span>
+                  <span className="font-medium text-red-600">
+                    -${Number(selectedSale.discountAmount).toLocaleString("es-ES", {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2
+                    })}
+                  </span>
+                </div>
+              )}
+
+              <div className="border-t pt-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-lg font-semibold text-gray-900">Total:</span>
+                  <span className="text-xl font-bold text-green-600">
+                    ${Number(selectedSale.total).toLocaleString("es-ES", {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2
+                    })}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Botones de Acción */}
+        <div className="flex justify-end space-x-3 pt-4 border-t">
+          <Button
+            variant="outline"
+            onClick={() => setSelectedSale(null)}
+          >
+            Cerrar
+          </Button>
+          <Button
+            onClick={() => {
+              setSaleForInvoice(selectedSale);
+              setInvoiceDialogOpen(true);
+              setSelectedSale(null);
+            }}
+            className="bg-blue-600 hover:bg-blue-700"
+          >
+            <Printer className="h-4 w-4 mr-2" />
+            Imprimir Factura
+          </Button>
+        </div>
+      </div>
+    </DialogContent>
+  </Dialog>
+)}
+
+      
     </div>
   );
 }

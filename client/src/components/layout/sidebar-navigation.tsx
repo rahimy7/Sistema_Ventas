@@ -141,7 +141,7 @@ export default function SidebarNavigation({ className }: SidebarNavigationProps)
             <BarChart3 className="h-5 w-5 text-white" />
           </div>
           <div>
-            <h1 className="text-lg font-bold text-gray-900">AutoParts</h1>
+            <h1 className="text-lg font-bold text-gray-900">RVR_VENTAS</h1>
             <p className="text-xs text-gray-500">Sistema de Gestión</p>
           </div>
         </div>

@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage.js";
 import session from "express-session";
 import ConnectPgSimple from "connect-pg-simple";
-import { pool } from "./db.js";
+import { db, pool } from "./db.js";
 import { loginSchema, type User, type LoginCredentials, insertUserSchema, insertAssetSchema, insertSupplierSchema } from "../shared/schema.js";
 import {
   insertIncomeSchema,
@@ -1099,6 +1099,22 @@ app.delete("/api/suppliers/:id", requireAuth, requireRole(['admin']), async (req
     res.status(500).json({ message: "Failed to delete supplier" });
   }
 });
+
+// Get sale items
+app.get("/api/sales", requireAuth, async (req, res) => {
+  try {
+    const sales = await db.query.sales.findMany({
+      with: {
+        items: true, // 👈 Esto incluye los productos
+      },
+    });
+    res.json(sales);
+  } catch (error) {
+    console.error("Error fetching sales:", error);
+    res.status(500).json({ message: "Failed to fetch sales" });
+  }
+});
+
 
 
 

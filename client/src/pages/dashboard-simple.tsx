@@ -12,8 +12,19 @@ import {
   ShoppingBag,
   Settings
 } from "lucide-react";
+import { type CompanySettings } from "@shared/schema";
+import { useQuery } from "@tanstack/react-query";
+
+
+
 
 export default function Dashboard() {
+    // Obtener configuración de la empresa
+  const { data: companySettings } = useQuery<CompanySettings>({
+    queryKey: ["/api/company-settings"],
+  });
+
+  const companyName = companySettings?.name || "Mi Negocio";
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -23,7 +34,7 @@ export default function Dashboard() {
             <BarChart3 className="h-6 w-6 text-white" />
           </div>
           <div>
-            <h1 className="text-3xl font-bold text-slate-900">Panel de Control</h1>
+           <h1 className="text-3xl font-bold text-slate-900">{companyName}</h1>
             <p className="text-slate-600 mt-1">Resumen ejecutivo de tu negocio automotriz</p>
           </div>
         </div>
