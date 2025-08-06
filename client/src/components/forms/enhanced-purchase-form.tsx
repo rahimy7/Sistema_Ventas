@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { JSXElementConstructor, Key, ReactElement, ReactNode, ReactPortal, useState } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -11,9 +11,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Trash2, Package, ShoppingCart, Settings, AlertTriangle } from "lucide-react";
+import { Plus, Trash2, Package, ShoppingCart, Settings, AlertTriangle, Building } from "lucide-react";
 import { z } from "zod";
 import { type InventoryItem, type ProductType } from "@shared/schema";
+import { type Supplier } from "@shared/schema";
+import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@radix-ui/react-dialog";
+import { DialogHeader } from "../ui/dialog";
+import SupplierForm from "./SuplierForm";
+
 
 // Schema para el formulario
 const purchaseItemSchema = z.object({
@@ -42,6 +47,10 @@ const enhancedPurchaseSchema = z.object({
   items: z.array(purchaseItemSchema).min(1, "Debe agregar al menos un producto"),
 });
 
+
+
+
+
 type PurchaseFormData = z.infer<typeof enhancedPurchaseSchema>;
 
 interface EnhancedPurchaseFormProps {
@@ -53,6 +62,12 @@ export default function EnhancedPurchaseForm({ onSuccess, onCancel }: EnhancedPu
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+ 
+  const { data: suppliers = [] } = useQuery<Supplier[]>({
+  queryKey: ["/api/suppliers"],
+});
+
+const activeSuppliers = suppliers.filter(supplier => supplier.isActive);
 
   // Cargar productos de inventario existentes
   const { data: inventory = [] } = useQuery<InventoryItem[]>({
@@ -262,20 +277,66 @@ export default function EnhancedPurchaseForm({ onSuccess, onCancel }: EnhancedPu
                   </FormItem>
                 )}
               />
-
-              <FormField
-                control={form.control}
-                name="supplier"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Proveedor *</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Nombre del proveedor" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+<FormField
+  control={form.control}
+  name="supplier"
+  render={({ field }) => (
+    <FormItem>
+      <FormLabel className="flex items-center gap-2">
+        <Building className="h-4 w-4" />
+        Proveedor *
+      </FormLabel>
+      <Select onValueChange={field.onChange} value={field.value}>
+        <FormControl>
+          <SelectTrigger>
+            <SelectValue placeholder="Seleccionar proveedor" />
+          </SelectTrigger>
+        </FormControl>
+        <SelectContent>
+          {activeSuppliers.map((supplier) => (
+            <SelectItem key={supplier.id} value={supplier.name}>
+              <div className="flex items-center gap-2">
+                <Building className="h-4 w-4" />
+                <div>
+                  <p className="font-medium">{supplier.name}</p>
+                  {supplier.contactPerson && (
+                    <p className="text-xs text-gray-500">{supplier.contactPerson}</p>
+                  )}
+                </div>
+              </div>
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      
+      {/* Botón para nuevo proveedor */}
+      <div className="flex items-center gap-2 mt-2">
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button type="button" variant="outline" size="sm">
+              <Plus className="h-4 w-4 mr-1" />
+              Nuevo Proveedor
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-3xl">
+            <DialogHeader>
+              <DialogTitle>Registrar Nuevo Proveedor</DialogTitle>
+            </DialogHeader>
+            <SupplierForm
+              onSuccess={() => {
+                queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] });
+              }}
+              onCancel={() => {}}
+            />
+          </DialogContent>
+        </Dialog>
+      </div>
+      
+      <FormMessage />
+    </FormItem>
+  )}
+/>
+       
 
               <FormField
                 control={form.control}

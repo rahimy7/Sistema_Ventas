@@ -4,7 +4,7 @@ import { storage } from "./storage.js";
 import session from "express-session";
 import ConnectPgSimple from "connect-pg-simple";
 import { pool } from "./db.js";
-import { loginSchema, type User, type LoginCredentials, insertUserSchema, insertAssetSchema } from "../shared/schema.js";
+import { loginSchema, type User, type LoginCredentials, insertUserSchema, insertAssetSchema, insertSupplierSchema } from "../shared/schema.js";
 import {
   insertIncomeSchema,
   insertExpenseSchema,
@@ -1023,6 +1023,84 @@ app.put("/api/users/:id/toggle-status", requireAuth, requireRole(['admin']), asy
     res.status(500).json({ message: "Failed to toggle user status" });
   }
 });
+
+// Supplier routes - admin only
+app.get("/api/suppliers", requireAuth, requireRole(['admin']), async (req, res) => {
+  try {
+    const suppliers = await storage.getSuppliers();
+    res.json(suppliers);
+  } catch (error) {
+    console.error("Error fetching suppliers:", error);
+    res.status(500).json({ message: "Failed to fetch suppliers" });
+  }
+});
+
+app.get("/api/suppliers/:id", requireAuth, requireRole(['admin']), async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const supplier = await storage.getSupplierById(id);
+    if (!supplier) {
+      return res.status(404).json({ message: "Supplier not found" });
+    }
+    res.json(supplier);
+  } catch (error) {
+    console.error("Error fetching supplier:", error);
+    res.status(500).json({ message: "Failed to fetch supplier" });
+  }
+});
+
+app.post("/api/suppliers", requireAuth, requireRole(['admin']), async (req, res) => {
+  try {
+    const data = insertSupplierSchema.parse(req.body);
+    const supplier = await storage.createSupplier(data);
+    res.status(201).json(supplier);
+  } catch (error) {
+    console.error("Error creating supplier:", error);
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ message: "Invalid data", errors: error.errors });
+    }
+    res.status(500).json({ message: "Failed to create supplier" });
+  }
+});
+
+app.put("/api/suppliers/:id", requireAuth, requireRole(['admin']), async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const data = insertSupplierSchema.partial().parse(req.body);
+    const supplier = await storage.updateSupplier(id, data);
+    res.json(supplier);
+  } catch (error) {
+    console.error("Error updating supplier:", error);
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ message: "Invalid data", errors: error.errors });
+    }
+    res.status(500).json({ message: "Failed to update supplier" });
+  }
+});
+
+app.put("/api/suppliers/:id/toggle-status", requireAuth, requireRole(['admin']), async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const supplier = await storage.toggleSupplierStatus(id);
+    res.json(supplier);
+  } catch (error) {
+    console.error("Error toggling supplier status:", error);
+    res.status(500).json({ message: "Failed to toggle supplier status" });
+  }
+});
+
+app.delete("/api/suppliers/:id", requireAuth, requireRole(['admin']), async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    await storage.deleteSupplier(id);
+    res.status(204).send();
+  } catch (error) {
+    console.error("Error deleting supplier:", error);
+    res.status(500).json({ message: "Failed to delete supplier" });
+  }
+});
+
+
 
   const httpServer = createServer(app);
   return httpServer;

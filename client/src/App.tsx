@@ -15,7 +15,9 @@ import PurchasesPage from "@/pages/purchases";
 import ReportsPage from "@/pages/reports";
 import SettingsPage from "@/pages/settings";
 import UsersPage from "@/pages/users";
+import AssetsPage from "@/pages/AssetsPage"; // Importar la página de activos
 import NotFound from "@/pages/not-found";
+import SuppliersPage from "@/pages/SuppliersPage";
 
 function AuthenticatedRouter() {
   const { isAuthenticated, isLoading, user } = useAuth();
@@ -51,13 +53,19 @@ function AuthenticatedRouter() {
         </Route>
         <Route path="/compras">
           <ProtectedRoute requiredRoles={['admin']}>
-            <PurchasesPage onSuccess={function (): void {
-              throw new Error("Function not implemented.");
-            } } onCancel={function (): void {
-              throw new Error("Function not implemented.");
-            } } />
+            <PurchasesPage />
           </ProtectedRoute>
         </Route>
+        <Route path="/activos">
+          <ProtectedRoute requiredRoles={['admin']}>
+            <AssetsPage />
+          </ProtectedRoute>
+        </Route>
+        <Route path="/proveedores">
+  <ProtectedRoute requiredRoles={['admin']}>
+    <SuppliersPage />
+  </ProtectedRoute>
+</Route>
         <Route path="/reportes">
           <ProtectedRoute requiredRoles={['admin']}>
             <ReportsPage />

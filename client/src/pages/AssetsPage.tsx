@@ -26,7 +26,7 @@ import {
   MapPin,
   AlertCircle,
   CheckCircle,
-  Tool,
+  Wrench,
   XCircle,
   BarChart3,
   Building,
@@ -143,7 +143,7 @@ export default function AssetsPage() {
       case "active": return <CheckCircle className="h-3 w-3" />;
       case "depreciated": return <TrendingDown className="h-3 w-3" />;
       case "disposed": return <XCircle className="h-3 w-3" />;
-      case "maintenance": return <Tool className="h-3 w-3" />;
+      case "maintenance": return <Wrench className="h-3 w-3" />;
       default: return <AlertCircle className="h-3 w-3" />;
     }
   };
@@ -366,7 +366,7 @@ export default function AssetsPage() {
           <Card className="text-center">
             <CardContent className="p-4">
               <div className="flex items-center justify-center mb-2">
-                <Tool className="h-8 w-8 text-orange-600" />
+                <Wrench className="h-8 w-8 text-orange-600" />
               </div>
               <p className="text-2xl font-bold text-orange-600">{assetStats.maintenanceAssets}</p>
               <p className="text-sm text-gray-600">Mantenimiento</p>
@@ -1113,7 +1113,7 @@ export default function AssetsPage() {
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
-                      <Tool className="h-5 w-5 text-orange-600" />
+                      <Wrench className="h-5 w-5 text-orange-600" />
                       Mantenimiento y Observaciones
                     </CardTitle>
                   </CardHeader>

@@ -16,7 +16,8 @@ import {
   Users,
   LogOut,
   Home,
-  TrendingUp
+  TrendingUp,
+  Building
 } from "lucide-react";
 
 interface NavigationItem {
@@ -55,6 +56,20 @@ const navigationItems: NavigationItem[] = [
     requiresRole: ["admin"],
     description: "Gestión de compras a proveedores"
   },
+  {
+    title: "Activos Fijos",
+    href: "/activos",
+    icon: Building,
+    requiresRole: ["admin"],
+    description: "Gestión de activos fijos y equipos"
+  },
+  {
+  title: "Proveedores",
+  href: "/proveedores", 
+  icon: Building,
+  requiresRole: ["admin"],
+  description: "Gestión de proveedores y contactos"
+},
   {
     title: "Reportes",
     href: "/reportes",

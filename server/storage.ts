@@ -47,7 +47,10 @@ import {
   Asset,
   InsertAsset,
   AssetStatus,
-  ProductType
+  ProductType,
+  Supplier,
+  InsertSupplier,
+  suppliers
 } from "../shared/schema.js";
 import { db } from "./db.js";
 import { eq, desc, sum, count, gte, lte, and, like } from "drizzle-orm";
@@ -131,6 +134,14 @@ updateUser(id: number, user: Partial<InsertUser>): Promise<User>;
 deleteUser(id: number): Promise<void>;
 updateUserPassword(id: number, password: string): Promise<void>;
 toggleUserStatus(id: number): Promise<User>;
+
+// Supplier operations
+getSuppliers(): Promise<Supplier[]>;
+getSupplierById(id: number): Promise<Supplier | undefined>;
+createSupplier(supplier: InsertSupplier): Promise<Supplier>;
+updateSupplier(id: number, supplier: Partial<InsertSupplier>): Promise<Supplier>;
+deleteSupplier(id: number): Promise<void>;
+toggleSupplierStatus(id: number): Promise<Supplier>;
 
   // Dashboard analytics
   getDashboardStats(): Promise<{
@@ -990,6 +1001,49 @@ async toggleUserStatus(id: number): Promise<User> {
     .where(eq(users.id, id))
     .returning();
   return updatedUser;
+}
+
+// Supplier operations
+async getSuppliers(): Promise<Supplier[]> {
+  return await db.select().from(suppliers).orderBy(suppliers.name);
+}
+
+async getSupplierById(id: number): Promise<Supplier | undefined> {
+  const [supplier] = await db.select().from(suppliers).where(eq(suppliers.id, id));
+  return supplier;
+}
+
+async createSupplier(supplier: InsertSupplier): Promise<Supplier> {
+  const [newSupplier] = await db.insert(suppliers).values(supplier).returning();
+  return newSupplier;
+}
+
+async updateSupplier(id: number, supplier: Partial<InsertSupplier>): Promise<Supplier> {
+  const [updatedSupplier] = await db
+    .update(suppliers)
+    .set({ ...supplier, updatedAt: new Date() })
+    .where(eq(suppliers.id, id))
+    .returning();
+  return updatedSupplier;
+}
+
+async deleteSupplier(id: number): Promise<void> {
+  await db.delete(suppliers).where(eq(suppliers.id, id));
+}
+
+async toggleSupplierStatus(id: number): Promise<Supplier> {
+  const supplier = await this.getSupplierById(id);
+  if (!supplier) throw new Error("Supplier not found");
+  
+  const [updatedSupplier] = await db
+    .update(suppliers)
+    .set({ 
+      isActive: !supplier.isActive,
+      updatedAt: new Date()
+    })
+    .where(eq(suppliers.id, id))
+    .returning();
+  return updatedSupplier;
 }
 }
 
