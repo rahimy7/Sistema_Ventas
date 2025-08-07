@@ -264,11 +264,37 @@ async getAssetById(id: number): Promise<Asset | undefined> {
 }
 
 async createAsset(asset: InsertAsset): Promise<Asset> {
+  // If supplier is provided but no supplierId, try to find matching supplier
+  if (asset.supplier && !asset.supplierId) {
+    const [matchingSupplier] = await db
+      .select()
+      .from(suppliers)
+      .where(eq(suppliers.name, asset.supplier))
+      .limit(1);
+    
+    if (matchingSupplier) {
+      asset.supplierId = matchingSupplier.id;
+    }
+  }
+
   const [newAsset] = await db.insert(assets).values(asset).returning();
   return newAsset;
 }
 
 async updateAsset(id: number, asset: Partial<InsertAsset>): Promise<Asset> {
+  // If supplier is provided but no supplierId, try to find matching supplier
+  if (asset.supplier && !asset.supplierId) {
+    const [matchingSupplier] = await db
+      .select()
+      .from(suppliers)
+      .where(eq(suppliers.name, asset.supplier))
+      .limit(1);
+    
+    if (matchingSupplier) {
+      asset.supplierId = matchingSupplier.id;
+    }
+  }
+
   const [updatedAsset] = await db
     .update(assets)
     .set({ ...asset, updatedAt: new Date() })
@@ -295,6 +321,7 @@ async updateAssetStatus(id: number, status: AssetStatus): Promise<Asset> {
 async createEnhancedPurchase(purchaseData: {
   purchaseDate: Date;
   supplier: string;
+  supplierId?: number;
   totalAmount: string;
   paymentMethod: string;
   invoiceNumber?: string;
@@ -311,7 +338,7 @@ async createEnhancedPurchase(purchaseData: {
     isNewProduct: boolean;
     salePrice?: string;
     reorderPoint?: string;
-    // Campos para activos
+    // Asset fields
     usefulLife?: string;
     depreciationRate?: string;
     serialNumber?: string;
@@ -324,10 +351,32 @@ async createEnhancedPurchase(purchaseData: {
     return await db.transaction(async (tx) => {
       console.log("Storage: Starting transaction");
       
+      // Find or create supplier if name provided
+      let supplierId = purchaseData.supplierId;
+      if (purchaseData.supplier && !supplierId) {
+        const [existingSupplier] = await tx
+          .select()
+          .from(suppliers)
+          .where(eq(suppliers.name, purchaseData.supplier))
+          .limit(1);
+        
+        if (existingSupplier) {
+          supplierId = existingSupplier.id;
+        } else {
+          // Create new supplier
+          const [newSupplier] = await tx.insert(suppliers).values({
+            name: purchaseData.supplier,
+            isActive: true,
+          }).returning();
+          supplierId = newSupplier.id;
+        }
+      }
+      
       // Create the purchase header
       const [purchase] = await tx.insert(purchases).values({
         purchaseDate: purchaseData.purchaseDate,
         supplier: purchaseData.supplier,
+        supplierId,
         totalAmount: purchaseData.totalAmount,
         paymentMethod: purchaseData.paymentMethod,
         invoiceNumber: purchaseData.invoiceNumber,
@@ -359,6 +408,7 @@ async createEnhancedPurchase(purchaseData: {
                 initialStock: item.quantity,
                 currentStock: item.quantity,
                 reorderPoint: item.reorderPoint || "0",
+                preferredSupplierId: supplierId,
               }).returning();
               
               inventoryId = newInventoryItem.id;
@@ -379,7 +429,7 @@ async createEnhancedPurchase(purchaseData: {
             } else if (inventoryId) {
               console.log("Storage: Updating existing inventory");
               
-              // Update existing inventory stock
+              // Update existing inventory stock and preferred supplier
               const [currentItem] = await tx.select().from(inventory).where(eq(inventory.id, inventoryId));
               if (currentItem) {
                 const previousStock = Number(currentItem.currentStock);
@@ -389,6 +439,7 @@ async createEnhancedPurchase(purchaseData: {
                 await tx.update(inventory)
                   .set({ 
                     currentStock: newStock.toString(),
+                    preferredSupplierId: supplierId,
                     updatedAt: new Date(),
                   })
                   .where(eq(inventory.id, inventoryId));
@@ -420,6 +471,7 @@ async createEnhancedPurchase(purchaseData: {
               depreciationRate: item.depreciationRate || "20",
               usefulLife: item.usefulLife ? parseInt(item.usefulLife) : 5,
               supplier: purchaseData.supplier,
+              supplierId,
               serialNumber: item.serialNumber,
               location: item.location,
               status: 'active',
@@ -440,6 +492,7 @@ async createEnhancedPurchase(purchaseData: {
               amount: item.totalAmount,
               paymentMethod: purchaseData.paymentMethod,
               receipt: `Compra #${purchase.id}`,
+              supplierId,
             });
           }
 

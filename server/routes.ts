@@ -904,6 +904,9 @@ app.put("/api/users/:id/password", requireAuth, requireRole(['admin']), async (r
 });
 
 // Asset routes - admin only
+// Replace the existing asset routes in routes.ts with these updated versions:
+
+// Asset routes - admin only
 app.get("/api/assets", requireAuth, requireRole(['admin']), async (req, res) => {
   try {
     const assets = await storage.getAssets();
@@ -930,7 +933,15 @@ app.get("/api/assets/:id", requireAuth, requireRole(['admin']), async (req, res)
 
 app.post("/api/assets", requireAuth, requireRole(['admin']), async (req, res) => {
   try {
-    const data = insertAssetSchema.parse(req.body);
+    const { purchaseDate, ...assetData } = req.body;
+    
+    // Convert purchaseDate string to Date if necessary
+    const processedData = {
+      ...assetData,
+      purchaseDate: purchaseDate ? new Date(purchaseDate) : new Date(),
+    };
+
+    const data = insertAssetSchema.parse(processedData);
     const asset = await storage.createAsset(data);
     res.status(201).json(asset);
   } catch (error) {
@@ -945,7 +956,15 @@ app.post("/api/assets", requireAuth, requireRole(['admin']), async (req, res) =>
 app.put("/api/assets/:id", requireAuth, requireRole(['admin']), async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const data = insertAssetSchema.partial().parse(req.body);
+    const { purchaseDate, ...assetData } = req.body;
+    
+    // Convert purchaseDate string to Date if provided
+    const processedData = {
+      ...assetData,
+      ...(purchaseDate && { purchaseDate: new Date(purchaseDate) }),
+    };
+
+    const data = insertAssetSchema.partial().parse(processedData);
     const asset = await storage.updateAsset(id, data);
     res.json(asset);
   } catch (error) {
@@ -980,14 +999,16 @@ app.delete("/api/assets/:id", requireAuth, requireRole(['admin']), async (req, r
   }
 });
 
-// Asset statistics
+// Asset statistics with supplier info
 app.get("/api/assets/stats", requireAuth, requireRole(['admin']), async (req, res) => {
   try {
     const assets = await storage.getAssets();
     
     const stats = {
       totalAssets: assets.length,
-      totalValue: assets.reduce((sum, asset) => sum + Number(asset.currentValue), 0),
+      totalPurchaseValue: assets.reduce((sum, asset) => sum + Number(asset.purchasePrice), 0),
+      totalCurrentValue: assets.reduce((sum, asset) => sum + Number(asset.currentValue), 0),
+      totalDepreciation: assets.reduce((sum, asset) => sum + (Number(asset.purchasePrice) - Number(asset.currentValue)), 0),
       activeAssets: assets.filter(a => a.status === 'active').length,
       depreciatedAssets: assets.filter(a => a.status === 'depreciated').length,
       maintenanceAssets: assets.filter(a => a.status === 'maintenance').length,
@@ -996,6 +1017,15 @@ app.get("/api/assets/stats", requireAuth, requireRole(['admin']), async (req, re
         acc[asset.category] = (acc[asset.category] || 0) + 1;
         return acc;
       }, {} as Record<string, number>),
+      bySupplier: assets.reduce((acc, asset) => {
+        const supplier = asset.supplier || 'Sin proveedor';
+        acc[supplier] = (acc[supplier] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>),
+      averageAge: assets.length > 0 ? assets.reduce((sum, asset) => {
+        const age = (new Date().getTime() - new Date(asset.purchaseDate).getTime()) / (1000 * 60 * 60 * 24 * 365);
+        return sum + age;
+      }, 0) / assets.length : 0,
     };
     
     res.json(stats);

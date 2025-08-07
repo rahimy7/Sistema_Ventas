@@ -37,7 +37,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { type Asset, type AssetStatus } from "@shared/schema";
+import { Supplier, type Asset, type AssetStatus } from "@shared/schema";
 
 export default function AssetsPage() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -54,6 +54,11 @@ export default function AssetsPage() {
   // Fetch assets
   const { data: assets = [], isLoading } = useQuery<Asset[]>({
     queryKey: ["/api/assets"],
+  });
+
+
+  const { data: suppliers = [] } = useQuery<Supplier[]>({
+    queryKey: ["/api/suppliers"],
   });
 
   // Delete asset mutation
