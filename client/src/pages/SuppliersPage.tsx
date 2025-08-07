@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -34,6 +34,11 @@ import {
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { type Supplier } from "@shared/schema";
+import { useLocation } from "wouter";
+
+
+
+
 
 export default function SuppliersPage() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -44,6 +49,16 @@ export default function SuppliersPage() {
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  const location = useLocation()[0];
+
+useEffect(() => {
+  const params = new URLSearchParams(location.split("?")[1]);
+  if (params.get("nuevo") === "1") {
+    setIsFormOpen(true);
+    setEditingSupplier(null);
+  }
+}, [location]);
 
   // Fetch suppliers
   const { data: suppliers = [], isLoading } = useQuery<Supplier[]>({
@@ -505,3 +520,11 @@ export default function SuppliersPage() {
     </div>
   );
 }
+
+function setIsFormOpen(arg0: boolean) {
+  throw new Error("Function not implemented.");
+}
+function setEditingSupplier(arg0: null) {
+  throw new Error("Function not implemented.");
+}
+

@@ -18,6 +18,10 @@ import { type Supplier } from "@shared/schema";
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@radix-ui/react-dialog";
 import { DialogHeader } from "../ui/dialog";
 import SupplierForm from "./SuplierForm";
+import { useLocation } from "wouter";
+import { navigate } from "wouter/use-browser-location";
+
+
 
 
 // Schema para el formulario
@@ -308,29 +312,19 @@ const activeSuppliers = suppliers.filter(supplier => supplier.isActive);
           ))}
         </SelectContent>
       </Select>
-      
-      {/* Botón para nuevo proveedor */}
-      <div className="flex items-center gap-2 mt-2">
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button type="button" variant="outline" size="sm">
-              <Plus className="h-4 w-4 mr-1" />
-              Nuevo Proveedor
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-3xl">
-            <DialogHeader>
-              <DialogTitle>Registrar Nuevo Proveedor</DialogTitle>
-            </DialogHeader>
-            <SupplierForm
-              onSuccess={() => {
-                queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] });
-              }}
-              onCancel={() => {}}
-            />
-          </DialogContent>
-        </Dialog>
-      </div>
+
+<Button
+  type="button"
+  variant="outline"
+  size="sm"
+  onClick={() => navigate("/proveedores?nuevo=1")}
+>
+  <Plus className="h-4 w-4 mr-1" />
+  Nuevo Proveedor
+</Button>
+
+
+ 
       
       <FormMessage />
     </FormItem>
