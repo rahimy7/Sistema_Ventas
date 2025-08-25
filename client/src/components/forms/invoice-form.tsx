@@ -3,7 +3,7 @@ import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { insertInvoiceSchema, type InsertInvoice } from "@shared/schema";
+import { insertInvoiceSchema } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Trash2, Plus, Calculator, Printer, Download } from "lucide-react";
 import { generateInvoicePDF, printInvoice } from "@/lib/pdf-utils";
 import { z } from "zod";
+import { format } from "date-fns";
 
 const invoiceFormSchema = insertInvoiceSchema.extend({
   items: z.array(z.object({
@@ -41,19 +42,21 @@ export default function InvoiceForm({ onSuccess }: InvoiceFormProps) {
     resolver: zodResolver(invoiceFormSchema),
     defaultValues: {
       invoiceNumber: "",
-      customerName: "",
-      customerEmail: "",
-      customerAddress: "",
-      customerPhone: "",
-      issueDate: new Date().toISOString().split('T')[0],
-      dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 días
+      clientName: "",
+      clientEmail: "",
+      clientAddress: "",
+      clientPhone: "",
+      issueDate: new Date(),
+      dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 días
       status: "pending",
       subtotal: "0",
-      tax: "0", 
-      discount: "0",
+      taxRate: "0",
+      taxAmount: "0",
+      discountRate: "0",
+      discountAmount: "0",
       total: "0",
       notes: "",
-      items: [{ description: "", quantity: "1", unitPrice: "0", total: "0" }]
+      items: [{ description: "", quantity: "1", unitPrice: "0", total: "0" }],
     },
   });
 
@@ -79,8 +82,8 @@ export default function InvoiceForm({ onSuccess }: InvoiceFormProps) {
 
   // Calcular totales cuando cambian los items
   const watchedItems = form.watch("items");
-  const watchedTax = form.watch("tax");
-  const watchedDiscount = form.watch("discount");
+  const watchedTaxRate = form.watch("taxRate");
+  const watchedDiscountAmount = form.watch("discountAmount");
 
   useEffect(() => {
     let subtotal = 0;
@@ -96,13 +99,15 @@ export default function InvoiceForm({ onSuccess }: InvoiceFormProps) {
     });
 
     // Calcular impuestos y descuentos
-    const tax = (subtotal * (parseFloat(watchedTax) || 0)) / 100;
-    const discount = parseFloat(watchedDiscount) || 0;
-    const total = subtotal + tax - discount;
+    const taxRate = parseFloat(watchedTaxRate) || 0;
+    const taxAmount = (subtotal * taxRate) / 100;
+    const discountAmount = parseFloat(watchedDiscountAmount) || 0;
+    const total = subtotal + taxAmount - discountAmount;
 
     form.setValue("subtotal", subtotal.toString());
+    form.setValue("taxAmount", taxAmount.toString());
     form.setValue("total", Math.max(0, total).toString());
-  }, [watchedItems, watchedTax, watchedDiscount, form]);
+  }, [watchedItems, watchedTaxRate, watchedDiscountAmount, form]);
 
   const createInvoiceMutation = useMutation({
     mutationFn: async (data: InvoiceFormData) => {
@@ -145,16 +150,17 @@ export default function InvoiceForm({ onSuccess }: InvoiceFormProps) {
       const mockInvoice = {
         id: 1,
         invoiceNumber: formData.invoiceNumber,
-        customerName: formData.customerName,
-        customerEmail: formData.customerEmail,
-        customerAddress: formData.customerAddress,
-        customerPhone: formData.customerPhone,
+        clientName: formData.clientName,
+        clientEmail: formData.clientEmail,
+        clientAddress: formData.clientAddress,
+        clientPhone: formData.clientPhone,
         issueDate: formData.issueDate,
         dueDate: formData.dueDate,
         status: formData.status,
         subtotal: formData.subtotal,
-        tax: formData.tax,
-        discount: formData.discount,
+        taxRate: formData.taxRate,
+        taxAmount: formData.taxAmount,
+        discountAmount: formData.discountAmount,
         total: formData.total,
         notes: formData.notes,
         createdAt: new Date(),
@@ -201,16 +207,17 @@ export default function InvoiceForm({ onSuccess }: InvoiceFormProps) {
       const mockInvoice = {
         id: 1,
         invoiceNumber: formData.invoiceNumber,
-        customerName: formData.customerName,
-        customerEmail: formData.customerEmail,
-        customerAddress: formData.customerAddress,
-        customerPhone: formData.customerPhone,
+        clientName: formData.clientName,
+        clientEmail: formData.clientEmail,
+        clientAddress: formData.clientAddress,
+        clientPhone: formData.clientPhone,
         issueDate: formData.issueDate,
         dueDate: formData.dueDate,
         status: formData.status,
         subtotal: formData.subtotal,
-        tax: formData.tax,
-        discount: formData.discount,
+        taxRate: formData.taxRate,
+        taxAmount: formData.taxAmount,
+        discountAmount: formData.discountAmount,
         total: formData.total,
         notes: formData.notes,
         createdAt: new Date(),
@@ -274,7 +281,11 @@ export default function InvoiceForm({ onSuccess }: InvoiceFormProps) {
                 <FormItem>
                   <FormLabel>Fecha de Emisión</FormLabel>
                   <FormControl>
-                    <Input type="date" {...field} />
+                    <Input
+                      type="date"
+                      value={field.value ? format(field.value, "yyyy-MM-dd") : ""}
+                      onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value) : null)}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -288,7 +299,11 @@ export default function InvoiceForm({ onSuccess }: InvoiceFormProps) {
                 <FormItem>
                   <FormLabel>Fecha de Vencimiento</FormLabel>
                   <FormControl>
-                    <Input type="date" {...field} />
+                    <Input
+                      type="date"
+                      value={field.value ? format(field.value, "yyyy-MM-dd") : ""}
+                      onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value) : null)}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -329,12 +344,12 @@ export default function InvoiceForm({ onSuccess }: InvoiceFormProps) {
           <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField
               control={form.control}
-              name="customerName"
+              name="clientName"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Nombre del Cliente</FormLabel>
                   <FormControl>
-                    <Input placeholder="Nombre completo o empresa" {...field} />
+                    <Input placeholder="Nombre completo o empresa" {...field} value={field.value ?? ""} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -343,12 +358,12 @@ export default function InvoiceForm({ onSuccess }: InvoiceFormProps) {
 
             <FormField
               control={form.control}
-              name="customerEmail"
+              name="clientEmail"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Email</FormLabel>
                   <FormControl>
-                    <Input type="email" placeholder="cliente@ejemplo.com" {...field} />
+                    <Input type="email" placeholder="cliente@ejemplo.com" {...field} value={field.value ?? ""} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -357,12 +372,12 @@ export default function InvoiceForm({ onSuccess }: InvoiceFormProps) {
 
             <FormField
               control={form.control}
-              name="customerPhone"
+              name="clientPhone"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Teléfono</FormLabel>
                   <FormControl>
-                    <Input placeholder="+1 234 567 8900" {...field} />
+                    <Input placeholder="+1 234 567 8900" {...field} value={field.value ?? ""} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -371,12 +386,12 @@ export default function InvoiceForm({ onSuccess }: InvoiceFormProps) {
 
             <FormField
               control={form.control}
-              name="customerAddress"
+              name="clientAddress"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Dirección</FormLabel>
                   <FormControl>
-                    <Textarea placeholder="Dirección completa" {...field} />
+                    <Textarea placeholder="Dirección completa" {...field} value={field.value ?? ""} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -500,12 +515,12 @@ export default function InvoiceForm({ onSuccess }: InvoiceFormProps) {
               <div className="space-y-4">
                 <FormField
                   control={form.control}
-                  name="tax"
+                  name="taxRate"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Impuesto (%)</FormLabel>
                       <FormControl>
-                        <Input type="number" min="0" step="0.01" placeholder="0" {...field} />
+                        <Input type="number" min="0" step="0.01" placeholder="0" {...field} value={field.value ?? ""} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -514,12 +529,12 @@ export default function InvoiceForm({ onSuccess }: InvoiceFormProps) {
 
                 <FormField
                   control={form.control}
-                  name="discount"
+                  name="discountAmount"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Descuento ($)</FormLabel>
                       <FormControl>
-                        <Input type="number" min="0" step="0.01" placeholder="0" {...field} />
+                        <Input type="number" min="0" step="0.01" placeholder="0" {...field} value={field.value ?? ""} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -534,11 +549,11 @@ export default function InvoiceForm({ onSuccess }: InvoiceFormProps) {
                 </div>
                 <div className="flex justify-between">
                   <span>Impuesto:</span>
-                  <span>${((parseFloat(form.watch("subtotal") || "0") * parseFloat(form.watch("tax") || "0")) / 100).toLocaleString()}</span>
+                  <span>${((parseFloat(form.watch("subtotal") || "0") * parseFloat(form.watch("taxRate") || "0")) / 100).toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Descuento:</span>
-                  <span>-${parseFloat(form.watch("discount") || "0").toLocaleString()}</span>
+                  <span>-${parseFloat(form.watch("discountAmount") || "0").toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between text-lg font-bold border-t pt-2">
                   <span>Total:</span>
@@ -561,10 +576,11 @@ export default function InvoiceForm({ onSuccess }: InvoiceFormProps) {
               render={({ field }) => (
                 <FormItem>
                   <FormControl>
-                    <Textarea 
-                      placeholder="Términos y condiciones, notas de pago, etc..." 
+                    <Textarea
+                      placeholder="Términos y condiciones, notas de pago, etc..."
                       className="min-h-[100px]"
-                      {...field} 
+                      {...field}
+                      value={field.value ?? ""}
                     />
                   </FormControl>
                   <FormMessage />
