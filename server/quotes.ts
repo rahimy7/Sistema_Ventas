@@ -121,6 +121,15 @@ router.post("/", async (req, res) => {
           message: `Producto con ID ${item.inventoryId} no encontrado en inventario`
         });
       }
+      
+      // Verificar stock disponible
+      const currentStock = parseFloat(inventoryItem.quantity);
+      const requestedQuantity = item.quantity;
+      if (currentStock < requestedQuantity) {
+        return res.status(400).json({
+          message: `Stock insuficiente para ${item.productName}. Disponible: ${currentStock}, Solicitado: ${requestedQuantity}`
+        });
+      }
     }
 
     const quote = await storage.createQuote(
@@ -169,7 +178,7 @@ router.put("/:id", async (req, res) => {
 
     const validatedData = createQuoteSchema.parse(req.body);
     
-    // Verificar que todos los productos existen en inventario
+    // Verificar productos en inventario
     for (const item of validatedData.items) {
       const inventoryItem = await storage.getInventoryItemById(item.inventoryId);
       if (!inventoryItem) {
@@ -177,20 +186,20 @@ router.put("/:id", async (req, res) => {
           message: `Producto con ID ${item.inventoryId} no encontrado en inventario`
         });
       }
+      
+      const currentStock = parseFloat(inventoryItem.quantity);
+      if (currentStock < item.quantity) {
+        return res.status(400).json({
+          message: `Stock insuficiente para ${item.productName}. Disponible: ${currentStock}, Solicitado: ${item.quantity}`
+        });
+      }
     }
 
-    // Eliminar items existentes y crear nuevos
-    await storage.deleteQuoteItems(id);
-    
     const updatedQuote = await storage.updateQuote(
       id,
-      validatedData.quote as Partial<InsertQuote>
+      validatedData.quote as Partial<InsertQuote>,
+      validatedData.items as InsertQuoteItem[]
     );
-
-    // Crear nuevos items
-    for (const itemData of validatedData.items) {
-      await storage.createQuoteItem(id, itemData as InsertQuoteItem);
-    }
 
     res.json(updatedQuote);
   } catch (error) {
@@ -220,15 +229,14 @@ router.patch("/:id/status", async (req, res) => {
 
     const { status } = updateQuoteStatusSchema.parse(req.body);
 
-    // Verificar que la cotización existe
     const existingQuote = await storage.getQuoteById(id);
     if (!existingQuote) {
       return res.status(404).json({ message: "Cotización no encontrada" });
     }
 
-    // Validar transiciones de estado
+    // Validar transiciones de estado válidas
     const validTransitions: Record<string, string[]> = {
-      draft: ["sent", "rejected"],
+      draft: ["sent"],
       sent: ["accepted", "rejected", "expired"],
       accepted: ["converted"],
       rejected: [],
@@ -237,12 +245,23 @@ router.patch("/:id/status", async (req, res) => {
     };
 
     if (!validTransitions[existingQuote.status].includes(status)) {
-      return res.status(400).json({ 
-        message: `No se puede cambiar el estado de ${existingQuote.status} a ${status}`
+      return res.status(400).json({
+        message: `No se puede cambiar el estado de '${existingQuote.status}' a '${status}'`
       });
     }
 
-    const updatedQuote = await storage.updateQuoteStatus(id, status);
+    // Verificar fecha de vencimiento para estados específicos
+    if (status === "expired") {
+      const now = new Date();
+      const validUntil = new Date(existingQuote.validUntil);
+      if (now <= validUntil) {
+        return res.status(400).json({
+          message: "No se puede marcar como expirada una cotización que aún está vigente"
+        });
+      }
+    }
+
+    const updatedQuote = await storage.updateQuote(id, { status });
     res.json(updatedQuote);
   } catch (error) {
     console.error("Error updating quote status:", error);
@@ -255,53 +274,56 @@ router.patch("/:id/status", async (req, res) => {
     }
     
     res.status(500).json({ 
-      message: "Error al actualizar el estado de la cotización",
+      message: "Error al actualizar el estado",
       error: error instanceof Error ? error.message : "Error desconocido"
     });
   }
 });
 
-// POST /api/quotes/:id/convert-to-sale - Convertir cotización a venta
-router.post("/:id/convert-to-sale", async (req, res) => {
+// POST /api/quotes/:id/convert - Convertir cotización a venta
+router.post("/:id/convert", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     if (isNaN(id)) {
       return res.status(400).json({ message: "ID de cotización inválido" });
     }
 
-    // Verificar que la cotización existe
     const existingQuote = await storage.getQuoteById(id);
     if (!existingQuote) {
       return res.status(404).json({ message: "Cotización no encontrada" });
     }
 
-    // Verificar que la cotización se puede convertir
+    // Solo se pueden convertir cotizaciones aceptadas
     if (existingQuote.status !== "accepted") {
-      return res.status(400).json({ 
+      return res.status(400).json({
         message: "Solo se pueden convertir cotizaciones aceptadas"
       });
     }
 
-    // Verificar que la cotización no ha expirado
-    if (new Date() > new Date(existingQuote.validUntil)) {
-      return res.status(400).json({ 
-        message: "No se puede convertir una cotización expirada"
+    // Verificar fecha de vencimiento
+    const now = new Date();
+    const validUntil = new Date(existingQuote.validUntil);
+    if (now > validUntil) {
+      return res.status(400).json({
+        message: "No se puede convertir una cotización vencida"
       });
     }
 
-    // Verificar stock disponible
-    const quoteItems = await storage.getQuoteItems(id);
-    for (const item of quoteItems) {
+    // Verificar stock disponible para todos los items
+    const items = await storage.getQuoteItems(id);
+    for (const item of items) {
       const inventoryItem = await storage.getInventoryItemById(item.inventoryId);
       if (!inventoryItem) {
-        return res.status(400).json({ 
-          message: `Producto ${item.productName} no encontrado en inventario`
+        return res.status(400).json({
+          message: `Producto ${item.productName} ya no está disponible en inventario`
         });
       }
       
-      if (Number(inventoryItem.currentStock) < Number(item.quantity)) {
-        return res.status(400).json({ 
-          message: `Stock insuficiente para ${item.productName}. Disponible: ${inventoryItem.currentStock}, Requerido: ${item.quantity}`
+      const currentStock = parseFloat(inventoryItem.quantity);
+      const requiredQuantity = parseFloat(item.quantity);
+      if (currentStock < requiredQuantity) {
+        return res.status(400).json({
+          message: `Stock insuficiente para ${item.productName}. Disponible: ${currentStock}, Requerido: ${requiredQuantity}`
         });
       }
     }
@@ -317,6 +339,59 @@ router.post("/:id/convert-to-sale", async (req, res) => {
   }
 });
 
+// POST /api/quotes/:id/duplicate - Duplicar cotización
+router.post("/:id/duplicate", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) {
+      return res.status(400).json({ message: "ID de cotización inválido" });
+    }
+
+    const originalQuote = await storage.getQuoteById(id);
+    if (!originalQuote) {
+      return res.status(404).json({ message: "Cotización no encontrada" });
+    }
+
+    const originalItems = await storage.getQuoteItems(id);
+
+    // Crear nueva cotización con datos de la original
+    const newQuoteData: InsertQuote = {
+      customerName: originalQuote.customerName,
+      customerEmail: originalQuote.customerEmail,
+      customerPhone: originalQuote.customerPhone,
+      customerAddress: originalQuote.customerAddress,
+      quoteDate: new Date(),
+      validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 días
+      subtotal: originalQuote.subtotal,
+      taxRate: originalQuote.taxRate,
+      taxAmount: originalQuote.taxAmount,
+      discountAmount: originalQuote.discountAmount,
+      total: originalQuote.total,
+      status: "draft",
+      notes: originalQuote.notes,
+      terms: originalQuote.terms,
+    };
+
+    const newItemsData: InsertQuoteItem[] = originalItems.map(item => ({
+      inventoryId: item.inventoryId,
+      productName: item.productName,
+      description: item.description,
+      quantity: item.quantity,
+      unitPrice: item.unitPrice,
+      subtotal: item.subtotal,
+    }));
+
+    const duplicatedQuote = await storage.createQuote(newQuoteData, newItemsData);
+    res.status(201).json(duplicatedQuote);
+  } catch (error) {
+    console.error("Error duplicating quote:", error);
+    res.status(500).json({ 
+      message: "Error al duplicar la cotización",
+      error: error instanceof Error ? error.message : "Error desconocido"
+    });
+  }
+});
+
 // DELETE /api/quotes/:id - Eliminar cotización
 router.delete("/:id", async (req, res) => {
   try {
@@ -325,16 +400,15 @@ router.delete("/:id", async (req, res) => {
       return res.status(400).json({ message: "ID de cotización inválido" });
     }
 
-    // Verificar que la cotización existe
     const existingQuote = await storage.getQuoteById(id);
     if (!existingQuote) {
       return res.status(404).json({ message: "Cotización no encontrada" });
     }
 
-    // Verificar que la cotización se puede eliminar
-    if (existingQuote.status === "converted") {
-      return res.status(400).json({ 
-        message: "No se puede eliminar una cotización que ya fue convertida a venta"
+    // Solo se pueden eliminar cotizaciones en borrador o rechazadas
+    if (!["draft", "rejected", "expired"].includes(existingQuote.status)) {
+      return res.status(400).json({
+        message: "Solo se pueden eliminar cotizaciones en borrador, rechazadas o expiradas"
       });
     }
 
@@ -349,15 +423,26 @@ router.delete("/:id", async (req, res) => {
   }
 });
 
-// POST /api/quotes/update-expired - Actualizar cotizaciones expiradas (tarea automatizada)
-router.post("/update-expired", async (req, res) => {
+// POST /api/quotes/expire-old - Marcar cotizaciones vencidas (tarea automática)
+router.post("/expire-old", async (req, res) => {
   try {
-    await storage.updateExpiredQuotes();
-    res.json({ message: "Cotizaciones expiradas actualizadas correctamente" });
+    const now = new Date();
+    const expiredQuotes = await storage.getExpiredQuotes(now);
+    
+    const updatedCount = await Promise.all(
+      expiredQuotes.map(quote => 
+        storage.updateQuote(quote.id, { status: "expired" })
+      )
+    );
+
+    res.json({ 
+      message: `${updatedCount.length} cotizaciones marcadas como expiradas`,
+      expiredQuotes: updatedCount
+    });
   } catch (error) {
-    console.error("Error updating expired quotes:", error);
+    console.error("Error expiring old quotes:", error);
     res.status(500).json({ 
-      message: "Error al actualizar cotizaciones expiradas",
+      message: "Error al procesar cotizaciones vencidas",
       error: error instanceof Error ? error.message : "Error desconocido"
     });
   }

@@ -24,7 +24,7 @@ import RevenueChart from "@/components/charts/revenue-chart";
 import SalesChart from "@/components/charts/sales-chart";
 import IncomeForm from "@/components/forms/income-form";
 import ExpenseForm from "@/components/forms/expense-form";
-import PurchaseForm from "@/components/forms/purchase-form";
+import PurchaseForm from "@/components/forms/enhanced-purchase-form";
 import InventoryForm from "@/components/forms/inventory-form";
 import EmployeeForm from "@/components/forms/employee-form";
 import InvoiceForm from "@/components/forms/invoice-form";
@@ -783,4 +783,5 @@ export default function Dashboard() {
       </main>
     </div>
   );
+}
 }
