@@ -610,6 +610,72 @@ export const quoteItemsRelations = relations(quoteItems, ({ one }) => ({
   }),
 }));
 
+export type QuoteWithStringValues = {
+  id: number;
+  quoteNumber: string;
+  customerName: string;
+  customerEmail?: string | null;
+  customerPhone?: string | null;
+  customerAddress?: string | null;
+  quoteDate: Date;
+  validUntil: Date;
+  subtotal: string; // decimal devuelve string
+  taxRate: string;   // decimal devuelve string
+  taxAmount: string; // decimal devuelve string
+  discountAmount: string; // decimal devuelve string
+  total: string;     // decimal devuelve string
+  status: QuoteStatus;
+  notes?: string | null;
+  terms?: string | null;
+  saleId?: number | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type QuoteItemWithStringValues = {
+  id: number;
+  quoteId: number;
+  inventoryId: number;
+  productName: string;
+  description?: string | null;
+  quantity: string;  // decimal devuelve string
+  unitPrice: string; // decimal devuelve string
+  subtotal: string;  // decimal devuelve string
+  createdAt: Date;
+};
+
+// Para el frontend, tipos que esperan números para cálculos
+export type QuoteForCalculations = Omit<QuoteWithStringValues, 'subtotal' | 'taxRate' | 'taxAmount' | 'discountAmount' | 'total'> & {
+  subtotal: number;
+  taxRate: number;
+  taxAmount: number;
+  discountAmount: number;
+  total: number;
+};
+
+export type QuoteItemForCalculations = Omit<QuoteItemWithStringValues, 'quantity' | 'unitPrice' | 'subtotal'> & {
+  quantity: number;
+  unitPrice: number;
+  subtotal: number;
+};
+
+// Utilidades de conversión
+export const convertQuoteToNumbers = (quote: QuoteWithStringValues): QuoteForCalculations => ({
+  ...quote,
+  subtotal: parseFloat(quote.subtotal || '0'),
+  taxRate: parseFloat(quote.taxRate || '0'),
+  taxAmount: parseFloat(quote.taxAmount || '0'),
+  discountAmount: parseFloat(quote.discountAmount || '0'),
+  total: parseFloat(quote.total || '0')
+});
+
+export const convertQuoteItemToNumbers = (item: QuoteItemWithStringValues): QuoteItemForCalculations => ({
+  ...item,
+  quantity: parseFloat(item.quantity || '0'),
+  unitPrice: parseFloat(item.unitPrice || '0'),
+  subtotal: parseFloat(item.subtotal || '0')
+});
+
 // AGREGAR ESTOS SCHEMAS DE INSERCIÓN DESPUÉS DE LOS EXISTENTES
 export const insertQuoteSchema = createInsertSchema(quotes).omit({
   id: true,

@@ -5,6 +5,7 @@ config();
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes.js";
 import path from "path";
+import { ExpiredQuotesJob } from './jobs/expired-quotes-job';
 
 console.log("🔧 Environment check:");
 console.log("NODE_ENV:", process.env.NODE_ENV);
@@ -15,8 +16,13 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
+
 // Trust proxy for Vercel
 app.set('trust proxy', 1);
+
+// Inicializar job de cotizaciones expiradas
+const expiredQuotesJob = new ExpiredQuotesJob(60); // Cada 60 minutos
+expiredQuotesJob.start();
 
 // Add health check endpoint BEFORE other middleware
 app.get("/api/health", (_req, res) => {
@@ -58,6 +64,38 @@ app.use((req, res, next) => {
   next();
 });
 
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('Recibida señal SIGTERM, cerrando servidor...');
+  expiredQuotesJob.stop();
+  process.exit(0);
+});
+
+process.on('SIGINT', () => {
+  console.log('Recibida señal SIGINT, cerrando servidor...');
+  expiredQuotesJob.stop();
+  process.exit(0);
+});
+
+// Endpoint manual para ejecutar verificación
+app.post('/api/admin/check-expired-quotes', async (req, res) => {
+  try {
+    await expiredQuotesJob.executeJob();
+    res.json({ 
+      message: 'Verificación de cotizaciones expiradas ejecutada exitosamente',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Error ejecutando verificación manual:', error);
+    res.status(500).json({ 
+      message: 'Error ejecutando verificación',
+      error: error instanceof Error ? error.message : 'Error desconocido'
+    });
+  }
+});
+
+
+
 (async () => {
   const server = await registerRoutes(app);
 
@@ -91,6 +129,11 @@ app.use((req, res, next) => {
       console.log(`Server running on ${host}:${port}`);
       console.log(`Health check available at http://${host}:${port}/api/health`);
     });
+
+    app.listen(port, () => {
+  console.log(`🚀 Servidor ejecutándose en puerto ${port}`);
+  console.log(`📋 Job de cotizaciones expiradas iniciado`);
+});
   }
 })().catch(error => {
   console.error('Failed to start server:', error);
