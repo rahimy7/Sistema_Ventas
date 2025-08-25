@@ -50,6 +50,13 @@ const navigationItems: NavigationItem[] = [
     description: "Registro y seguimiento de ventas"
   },
   {
+    title: "Cotizaciones",
+    href: "/cotizaciones",
+    icon: FileText,
+    requiresRole: ["admin", "sales"],
+    description: "Gestión de cotizaciones y presupuestos"
+  },
+  {
     title: "Compras",
     href: "/compras",
     icon: ShoppingBag,

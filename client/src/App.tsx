@@ -11,6 +11,7 @@ import MainLayout from "@/components/layout/main-layout";
 import Dashboard from "@/pages/dashboard-simple";
 import InventoryPage from "@/pages/inventory";
 import SalesPage from "@/pages/sales";
+import QuotesPage from "@/pages/quotes";
 import PurchasesPage from "@/pages/purchases";
 import ReportsPage from "@/pages/reports";
 import SettingsPage from "@/pages/settings";
@@ -49,6 +50,11 @@ function AuthenticatedRouter() {
         <Route path="/ventas">
           <ProtectedRoute requiredRoles={['admin', 'sales']}>
             <SalesPage />
+          </ProtectedRoute>
+        </Route>
+        <Route path="/cotizaciones">
+          <ProtectedRoute requiredRoles={['admin', 'sales']}>
+            <QuotesPage />
           </ProtectedRoute>
         </Route>
         <Route path="/compras">
