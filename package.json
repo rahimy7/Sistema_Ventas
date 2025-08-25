@@ -119,5 +119,5 @@
   "optionalDependencies": {
     "bufferutil": "^4.0.8"
   },
-  "packageManager": "yarn@4.0.0+sha512.955259c0370ab8c06d013faa7d5e7addb6914251029695675f54e04c917ea6b092c379ba8d3521556d90b3874e5037759467072f01d2295341ead43cc259f14b"
+  "packageManager": "npm@10.9.3"
 }
