@@ -9,11 +9,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import SaleFormEnhanced from "@/components/forms/sale-form-enhanced";
 import SaleInvoiceDialog from "@/components/invoice/sale-invoice-dialog";
 import HomeButton from "@/components/ui/home-button";
-import { 
-  ShoppingCart, 
-  Plus, 
-  DollarSign, 
-  TrendingUp, 
+import {
+  ShoppingCart,
+  Plus,
+  DollarSign,
+  TrendingUp,
   Calendar,
   User,
   CreditCard,
@@ -57,7 +57,7 @@ export default function SalesPage() {
       return saleDate.toDateString() === today.toDateString();
     }).length,
     totalRevenue: sales.reduce((sum, sale) => sum + Number(sale.total), 0),
-    averageTicket: sales.length > 0 ? 
+    averageTicket: sales.length > 0 ?
       sales.reduce((sum, sale) => sum + Number(sale.total), 0) / sales.length : 0,
   };
 
@@ -292,7 +292,7 @@ export default function SalesPage() {
                 Detalles de la Venta #{selectedSale.saleNumber}
               </DialogTitle>
             </DialogHeader>
-            
+
             <div className="space-y-6">
               {/* Información del Cliente */}
               <Card>
@@ -387,17 +387,17 @@ export default function SalesPage() {
                           <div className="flex-1">
                             <p className="font-medium text-gray-900">{item.productName}</p>
                             <p className="text-sm text-gray-600">
-                              {item.quantity} x ${Number(item.unitPrice).toLocaleString('es-ES', { 
-                                minimumFractionDigits: 2, 
-                                maximumFractionDigits: 2 
+                              {item.quantity} x ${Number(item.unitPrice).toLocaleString('es-ES', {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2
                               })}
                             </p>
                           </div>
                           <div className="text-right">
                             <p className="font-semibold text-gray-900">
-                              ${Number(item.subtotal).toLocaleString('es-ES', { 
-                                minimumFractionDigits: 2, 
-                                maximumFractionDigits: 2 
+                              ${Number(item.subtotal).toLocaleString('es-ES', {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2
                               })}
                             </p>
                           </div>
@@ -423,46 +423,46 @@ export default function SalesPage() {
                     <div className="flex justify-between items-center">
                       <span className="text-gray-600">Subtotal:</span>
                       <span className="font-medium">
-                        ${Number(selectedSale.subtotal).toLocaleString('es-ES', { 
-                          minimumFractionDigits: 2, 
-                          maximumFractionDigits: 2 
+                        ${Number(selectedSale.subtotal).toLocaleString('es-ES', {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2
                         })}
                       </span>
                     </div>
-                    
+
                     {Number(selectedSale.taxAmount) > 0 && (
                       <div className="flex justify-between items-center">
                         <span className="text-gray-600">
                           Impuestos ({Number(selectedSale.taxRate)}%):
                         </span>
                         <span className="font-medium">
-                          ${Number(selectedSale.taxAmount).toLocaleString('es-ES', { 
-                            minimumFractionDigits: 2, 
-                            maximumFractionDigits: 2 
+                          ${Number(selectedSale.taxAmount).toLocaleString('es-ES', {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2
                           })}
                         </span>
                       </div>
                     )}
-                    
+
                     {Number(selectedSale.discountAmount) > 0 && (
                       <div className="flex justify-between items-center">
                         <span className="text-gray-600">Descuento:</span>
                         <span className="font-medium text-red-600">
-                          -${Number(selectedSale.discountAmount).toLocaleString('es-ES', { 
-                            minimumFractionDigits: 2, 
-                            maximumFractionDigits: 2 
+                          -${Number(selectedSale.discountAmount).toLocaleString('es-ES', {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2
                           })}
                         </span>
                       </div>
                     )}
-                    
+
                     <div className="border-t pt-3">
                       <div className="flex justify-between items-center">
                         <span className="text-lg font-semibold text-gray-900">Total:</span>
                         <span className="text-xl font-bold text-green-600">
-                          ${Number(selectedSale.total).toLocaleString('es-ES', { 
-                            minimumFractionDigits: 2, 
-                            maximumFractionDigits: 2 
+                          ${Number(selectedSale.total).toLocaleString('es-ES', {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2
                           })}
                         </span>
                       </div>

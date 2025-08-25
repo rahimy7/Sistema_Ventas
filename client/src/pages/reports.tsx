@@ -342,7 +342,7 @@ export default function ReportsPage() {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-purple-700 text-sm font-medium">Ticket Promedio</p>
+                    <p className="text-purple-700 text-sm font-medium">Ticket omedio</p>
                     <p className="text-2xl font-bold text-purple-900">
                       ${monthlyStats.averageTicket.toLocaleString('es-ES', { minimumFractionDigits: 2 })}
                     </p>

@@ -50,10 +50,17 @@ import {
   ProductType,
   Supplier,
   InsertSupplier,
-  suppliers
+  suppliers,
+  quotes,
+  InsertQuote,
+  InsertQuoteItem,
+  Quote,
+  QuoteItem,
+  quoteItems,
+  QuoteStatus
 } from "../shared/schema.js";
 import { db } from "./db.js";
-import { eq, desc, sum, count, gte, lte, and, like } from "drizzle-orm";
+import { eq, desc, sum, count, gte, lte, and, like, inArray } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 
 export interface IStorage {
@@ -1098,6 +1105,211 @@ async toggleSupplierStatus(id: number): Promise<Supplier> {
     .returning();
   return updatedSupplier;
 }
+
+// Agregar estos métodos a la clase Storage en storage.ts
+
+  // Quote operations
+  async getQuotes(): Promise<Quote[]> {
+    return await db.select().from(quotes).orderBy(desc(quotes.quoteDate));
+  }
+
+  async getQuoteById(id: number): Promise<Quote | undefined> {
+    const [quote] = await db.select().from(quotes).where(eq(quotes.id, id));
+    return quote;
+  }
+
+  async createQuote(quoteData: InsertQuote, itemsData: InsertQuoteItem[]): Promise<Quote> {
+    // Generate quote number
+    const quoteNumber = await this.generateQuoteNumber();
+    
+    const [quote] = await db.insert(quotes).values({
+      ...quoteData,
+      quoteNumber
+    }).returning();
+    
+    // Create quote items
+    for (const itemData of itemsData) {
+      await db.insert(quoteItems).values({
+        ...itemData,
+        quoteId: quote.id
+      });
+    }
+
+    return quote;
+  }
+
+  async updateQuote(id: number, quoteData: Partial<InsertQuote>): Promise<Quote> {
+    const [updatedQuote] = await db
+      .update(quotes)
+      .set({ ...quoteData, updatedAt: new Date() })
+      .where(eq(quotes.id, id))
+      .returning();
+    return updatedQuote;
+  }
+
+  async deleteQuote(id: number): Promise<void> {
+    // Delete quote items and quote
+    await db.delete(quoteItems).where(eq(quoteItems.quoteId, id));
+    await db.delete(quotes).where(eq(quotes.id, id));
+  }
+
+  async getQuoteItems(quoteId: number): Promise<QuoteItem[]> {
+    return await db.select().from(quoteItems).where(eq(quoteItems.quoteId, quoteId));
+  }
+
+  async generateQuoteNumber(): Promise<string> {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    
+    const [lastQuote] = await db
+      .select({ quoteNumber: quotes.quoteNumber })
+      .from(quotes)
+      .where(like(quotes.quoteNumber, `COT${year}${month}%`))
+      .orderBy(desc(quotes.quoteNumber))
+      .limit(1);
+
+    let nextNumber = 1;
+    if (lastQuote) {
+      const lastNumber = parseInt(lastQuote.quoteNumber.slice(-4));
+      nextNumber = lastNumber + 1;
+    }
+
+    return `COT${year}${month}${String(nextNumber).padStart(4, '0')}`;
+  }
+
+  // Convert quote to sale
+  async convertQuoteToSale(quoteId: number): Promise<Sale> {
+    return await db.transaction(async (tx) => {
+      // Get quote data
+      const [quote] = await tx.select().from(quotes).where(eq(quotes.id, quoteId));
+      if (!quote) {
+        throw new Error("Cotización no encontrada");
+      }
+
+      // Get quote items
+      const items = await tx.select().from(quoteItems).where(eq(quoteItems.quoteId, quoteId));
+      
+      // Generate sale number
+      const saleNumber = await this.generateSaleNumber();
+      
+      // Create sale
+      const [sale] = await tx.insert(sales).values({
+        saleNumber,
+        customerName: quote.customerName,
+        customerEmail: quote.customerEmail,
+        customerPhone: quote.customerPhone,
+        customerAddress: quote.customerAddress,
+        saleDate: new Date(),
+        subtotal: quote.subtotal,
+        taxRate: quote.taxRate,
+        taxAmount: quote.taxAmount,
+        discountAmount: quote.discountAmount,
+        total: quote.total,
+        paymentMethod: "pending", // Se debe actualizar después
+        status: "pending",
+        notes: `Generada desde cotización ${quote.quoteNumber}`,
+      }).returning();
+
+      // Create sale items and adjust inventory
+      for (const item of items) {
+        await tx.insert(saleItems).values({
+          saleId: sale.id,
+          inventoryId: item.inventoryId,
+          productName: item.productName,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          subtotal: item.subtotal,
+        });
+
+        // Adjust inventory stock (decrease)
+        const quantityNum = Number(item.quantity);
+        await this.adjustStock(
+          item.inventoryId,
+          -quantityNum,
+          "Venta desde cotización",
+          `Venta #${saleNumber} (Cotización #${quote.quoteNumber})`
+        );
+      }
+
+      // Update quote status and link to sale
+      await tx
+        .update(quotes)
+        .set({ 
+          status: "converted", 
+          saleId: sale.id,
+          updatedAt: new Date() 
+        })
+        .where(eq(quotes.id, quoteId));
+
+      return sale;
+    });
+  }
+
+  // Update quote status
+  async updateQuoteStatus(id: number, status: QuoteStatus): Promise<Quote> {
+    const [updatedQuote] = await db
+      .update(quotes)
+      .set({ status, updatedAt: new Date() })
+      .where(eq(quotes.id, id))
+      .returning();
+    return updatedQuote;
+  }
+
+  // Get quotes stats
+  async getQuoteStats(): Promise<{
+    totalQuotes: number;
+    pendingQuotes: number;
+    acceptedQuotes: number;
+    convertedQuotes: number;
+    totalQuoteValue: string;
+  }> {
+    // Total quotes
+    const [totalResult] = await db
+      .select({
+        count: count(),
+        sum: sum(quotes.total),
+      })
+      .from(quotes);
+
+    // Pending quotes (sent but not responded)
+    const [pendingResult] = await db
+      .select({ count: count() })
+      .from(quotes)
+      .where(eq(quotes.status, "sent"));
+
+    // Accepted quotes
+    const [acceptedResult] = await db
+      .select({ count: count() })
+      .from(quotes)
+      .where(eq(quotes.status, "accepted"));
+
+    // Converted quotes
+    const [convertedResult] = await db
+      .select({ count: count() })
+      .from(quotes)
+      .where(eq(quotes.status, "converted"));
+
+    return {
+      totalQuotes: totalResult.count,
+      pendingQuotes: pendingResult.count,
+      acceptedQuotes: acceptedResult.count,
+      convertedQuotes: convertedResult.count,
+      totalQuoteValue: totalResult.sum || "0",
+    };
+  }
+
+  // Check and update expired quotes
+  async updateExpiredQuotes(): Promise<void> {
+    const now = new Date();
+    await db
+      .update(quotes)
+      .set({ status: "expired", updatedAt: now })
+      .where(and(
+        lte(quotes.validUntil, now),
+        inArray(quotes.status, ["draft", "sent"])
+      ));
+  }
 }
 
 export const storage = new DatabaseStorage();

@@ -548,3 +548,91 @@ export const loginSchema = z.object({
 });
 
 export type LoginCredentials = z.infer<typeof loginSchema>;
+
+// Agregar al final de tu archivo shared/schema.ts
+
+// Quote status enum - AGREGAR DESPUÉS DE LOS OTROS ENUMS
+export const quoteStatusEnum = pgEnum('quote_status', ['draft', 'sent', 'accepted', 'rejected', 'expired', 'converted']);
+
+// Quotes table - AGREGAR DESPUÉS DE LA TABLA sales
+export const quotes = pgTable("quotes", {
+  id: serial("id").primaryKey(),
+  quoteNumber: varchar("quote_number", { length: 50 }).notNull().unique(),
+  customerName: text("customer_name").notNull(),
+  customerEmail: varchar("customer_email", { length: 255 }),
+  customerPhone: varchar("customer_phone", { length: 20 }),
+  customerAddress: text("customer_address"),
+  quoteDate: timestamp("quote_date").notNull(),
+  validUntil: timestamp("valid_until").notNull(),
+  subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull(),
+  taxRate: decimal("tax_rate", { precision: 5, scale: 2 }).default("0"),
+  taxAmount: decimal("tax_amount", { precision: 10, scale: 2 }).default("0"),
+  discountAmount: decimal("discount_amount", { precision: 10, scale: 2 }).default("0"),
+  total: decimal("total", { precision: 10, scale: 2 }).notNull(),
+  status: quoteStatusEnum("status").notNull().default("draft"),
+  notes: text("notes"),
+  terms: text("terms"),
+  saleId: integer("sale_id").references(() => sales.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Quote items table - AGREGAR DESPUÉS DE LA TABLA quotes
+export const quoteItems = pgTable("quote_items", {
+  id: serial("id").primaryKey(),
+  quoteId: integer("quote_id").references(() => quotes.id, { onDelete: "cascade" }).notNull(),
+  inventoryId: integer("inventory_id").references(() => inventory.id).notNull(),
+  productName: text("product_name").notNull(),
+  description: text("description"),
+  quantity: decimal("quantity", { precision: 10, scale: 2 }).notNull(),
+  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
+  subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// AGREGAR ESTAS RELACIONES DESPUÉS DE LAS RELACIONES EXISTENTES
+export const quotesRelations = relations(quotes, ({ many, one }) => ({
+  items: many(quoteItems),
+  sale: one(sales, {
+    fields: [quotes.saleId],
+    references: [sales.id],
+  }),
+}));
+
+export const quoteItemsRelations = relations(quoteItems, ({ one }) => ({
+  quote: one(quotes, {
+    fields: [quoteItems.quoteId],
+    references: [quotes.id],
+  }),
+  inventory: one(inventory, {
+    fields: [quoteItems.inventoryId],
+    references: [inventory.id],
+  }),
+}));
+
+// AGREGAR ESTOS SCHEMAS DE INSERCIÓN DESPUÉS DE LOS EXISTENTES
+export const insertQuoteSchema = createInsertSchema(quotes).omit({
+  id: true,
+  quoteNumber: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertQuoteItemSchema = createInsertSchema(quoteItems).omit({
+  id: true,
+  quoteId: true,
+  createdAt: true,
+});
+
+// AGREGAR ESTOS TIPOS AL FINAL DEL ARCHIVO, DESPUÉS DE LOS EXISTENTES
+export type Quote = typeof quotes.$inferSelect;
+export type InsertQuote = z.infer<typeof insertQuoteSchema>;
+export type QuoteStatus = 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired' | 'converted';
+
+export type QuoteItem = typeof quoteItems.$inferSelect;
+export type InsertQuoteItem = z.infer<typeof insertQuoteItemSchema>;
+
+export type QuoteWithItems = Quote & {
+  items: QuoteItem[];
+};
+
