@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Download, Printer, FileText, X } from "lucide-react";
@@ -104,6 +104,9 @@ export default function PDFOptionsDialog({
             <FileText className="h-5 w-5" />
             Opciones de Factura
           </DialogTitle>
+          <DialogDescription>
+            Elige cómo deseas obtener la factura de esta venta
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">

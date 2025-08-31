@@ -16,11 +16,12 @@ if (!process.env.DATABASE_URL) {
 }
 
 // Create pool with better configuration for serverless
-export const pool = new Pool({ 
+export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   max: 1, // Limit connections for serverless
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 5000,
+  // Increase connection timeout to reduce transient connection errors
+  connectionTimeoutMillis: 10000,
 });
 
 // Handle pool errors

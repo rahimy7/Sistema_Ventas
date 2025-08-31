@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import Sidebar from "@/components/layout/sidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -214,14 +214,17 @@ export default function Dashboard() {
               Nuevo Ingreso
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Registrar Nuevo Ingreso</DialogTitle>
-            </DialogHeader>
-            <IncomeForm onSuccess={() => setIsDialogOpen(false)} />
-          </DialogContent>
-        </Dialog>
-      </div>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Registrar Nuevo Ingreso</DialogTitle>
+            <DialogDescription>
+              Añada un ingreso para mantener actualizado el flujo de caja
+            </DialogDescription>
+          </DialogHeader>
+          <IncomeForm onSuccess={() => setIsDialogOpen(false)} />
+        </DialogContent>
+      </Dialog>
+    </div>
       <Card>
         <CardHeader>
           <CardTitle>Registro de Ingresos</CardTitle>
@@ -280,6 +283,9 @@ export default function Dashboard() {
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>Registrar Nuevo Gasto</DialogTitle>
+              <DialogDescription>
+                Registre un gasto para controlar las finanzas
+              </DialogDescription>
             </DialogHeader>
             <ExpenseForm onSuccess={() => setIsDialogOpen(false)} />
           </DialogContent>
@@ -361,6 +367,9 @@ export default function Dashboard() {
             <DialogContent className="max-w-2xl">
               <DialogHeader>
                 <DialogTitle>Agregar Producto al Inventario</DialogTitle>
+                <DialogDescription>
+                  Registre un nuevo producto para su seguimiento en inventario
+                </DialogDescription>
               </DialogHeader>
               <InventoryForm onSuccess={() => setIsDialogOpen(false)} />
             </DialogContent>
@@ -430,6 +439,9 @@ export default function Dashboard() {
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>Registrar Nuevo Empleado</DialogTitle>
+              <DialogDescription>
+                Ingrese los datos del empleado para almacenarlos en el sistema
+              </DialogDescription>
             </DialogHeader>
             <EmployeeForm onSuccess={() => setIsDialogOpen(false)} />
           </DialogContent>
@@ -503,6 +515,9 @@ export default function Dashboard() {
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>Registrar Nueva Compra</DialogTitle>
+              <DialogDescription>
+                Ingrese los detalles de la compra realizada
+              </DialogDescription>
             </DialogHeader>
             <PurchaseForm onSuccess={() => setIsDialogOpen(false)} />
           </DialogContent>
@@ -566,6 +581,9 @@ export default function Dashboard() {
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Crear Nueva Factura</DialogTitle>
+              <DialogDescription>
+                Complete los campos para emitir una factura
+              </DialogDescription>
             </DialogHeader>
             <InvoiceForm onSuccess={() => setIsDialogOpen(false)} />
           </DialogContent>

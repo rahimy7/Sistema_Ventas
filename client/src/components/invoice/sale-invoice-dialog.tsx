@@ -4,6 +4,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -185,6 +186,9 @@ export default function SaleInvoiceDialog({
             <FileText className="h-5 w-5" />
             Detalles de Venta - {sale.saleNumber || `#${sale.id}`}
           </DialogTitle>
+          <DialogDescription>
+            Información detallada de la venta seleccionada
+          </DialogDescription>
         </DialogHeader>
 
         <ScrollArea className="max-h-[70vh]">

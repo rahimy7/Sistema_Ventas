@@ -52,9 +52,9 @@ export default function SaleFormEnhanced({ onSuccess }: SaleFormProps) {
     resolver: zodResolver(saleFormSchema),
     defaultValues: {
       customerName: "",
-      customerEmail: null,
-      customerPhone: null,
-      customerAddress: null,
+      customerEmail: "",
+      customerPhone: "",
+      customerAddress: "",
       saleDate: new Date(),
       subtotal: "0",
       taxRate: "16",
@@ -63,7 +63,7 @@ export default function SaleFormEnhanced({ onSuccess }: SaleFormProps) {
       total: "0",
       paymentMethod: "",
       status: "completed",
-      notes: null,
+      notes: "",
       items: [],
     },
   });
