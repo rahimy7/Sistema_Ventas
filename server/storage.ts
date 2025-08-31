@@ -821,32 +821,66 @@ async getPurchaseItems(purchaseId: number) {
   }
 
   async createSale(saleData: InsertSale, itemsData: InsertSaleItem[]): Promise<Sale> {
-    // Generate sale number
-    const saleNumber = await this.generateSaleNumber();
-    
-    const [sale] = await db.insert(sales).values({
-      ...saleData,
-      saleNumber
-    }).returning();
-    
-    // Create sale items and adjust inventory
-    for (const itemData of itemsData) {
-      await db.insert(saleItems).values({
-        ...itemData,
-        saleId: sale.id
-      });
+    // Wrap entire sale creation in a transaction to avoid partial saves
+    return await db.transaction(async (tx) => {
+      // Generate a new sale number
+      const saleNumber = await this.generateSaleNumber();
 
-      // Adjust inventory stock (decrease)
-      const quantityNum = Number(itemData.quantity);
-      await this.adjustStock(
-        itemData.inventoryId,
-        -quantityNum,
-        "Venta",
-        `Venta #${saleNumber}`
-      );
-    }
+      // Create sale header
+      const [sale] = await tx
+        .insert(sales)
+        .values({
+          ...saleData,
+          saleNumber,
+        })
+        .returning();
 
-    return sale;
+      // Create sale items and adjust inventory atomically
+      for (const itemData of itemsData) {
+        // Insert sale item
+        await tx.insert(saleItems).values({
+          ...itemData,
+          saleId: sale.id,
+        });
+
+        // Fetch current inventory information
+        const [invItem] = await tx
+          .select()
+          .from(inventory)
+          .where(eq(inventory.id, itemData.inventoryId));
+
+        if (!invItem) {
+          throw new Error("Inventory item not found");
+        }
+
+        const quantityNum = Number(itemData.quantity);
+        const previousStock = Number(invItem.currentStock);
+        const newStock = previousStock - quantityNum;
+
+        // Record stock movement
+        await tx.insert(stockMovements).values({
+          inventoryId: itemData.inventoryId,
+          movementType: "out",
+          quantity: quantityNum.toString(),
+          previousStock: previousStock.toString(),
+          newStock: newStock.toString(),
+          reason: "Venta",
+          reference: `Venta #${saleNumber}`,
+          createdBy: "system",
+        });
+
+        // Update inventory stock
+        await tx
+          .update(inventory)
+          .set({
+            currentStock: newStock.toString(),
+            updatedAt: new Date(),
+          })
+          .where(eq(inventory.id, itemData.inventoryId));
+      }
+
+      return sale;
+    });
   }
 
   async updateSale(id: number, saleData: Partial<InsertSale>): Promise<Sale> {
