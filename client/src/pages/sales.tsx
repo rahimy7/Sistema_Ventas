@@ -70,11 +70,7 @@ export default function SalesPage() {
     queryKey: ["/api/sales"],
   });
 
-  // Cargar items de la venta seleccionada
-  const { data: selectedSaleItems = [] } = useQuery<SaleItem[]>({
-    queryKey: ["/api/sales", selectedSale?.id, "items"],
-    enabled: !!selectedSale,
-  });
+
 
   // Estadísticas de ventas
   const salesStats = {
@@ -117,10 +113,33 @@ export default function SalesPage() {
     }
   };
 
-  const handleViewInvoice = (sale: SaleWithItems) => {
-    setSaleForInvoice(sale);
+const handleViewInvoice = async (sale: SaleWithItems) => {
+  try {
+    console.log("Loading items for sale:", sale.id);
+    
+    // Cargar items desde la API
+    const items = await apiRequest("GET", `/api/sales/${sale.id}/items`);
+    console.log("Loaded items from API:", items);
+    
+    // Crear objeto de venta con items
+    const saleWithItems: SaleWithItems = {
+      ...sale,
+      items: items
+    };
+    
+    setSaleForInvoice(saleWithItems);
     setInvoiceDialogOpen(true);
-  };
+    
+  } catch (error) {
+    console.error("Error loading sale items:", error);
+    toast({
+      title: "Error",
+      description: "No se pudieron cargar los detalles de la venta.",
+      variant: "destructive",
+    });
+  }
+};
+
 
   const handleDelete = (id: number) => {
     deleteSale.mutate(id);
@@ -358,14 +377,14 @@ export default function SalesPage() {
 
       {/* Diálogo de factura de venta */}
       {saleForInvoice && (
-        <SaleInvoiceDialog
-          open={invoiceDialogOpen}
-          onOpenChange={setInvoiceDialogOpen}
-          sale={saleForInvoice}
-          saleItems={selectedSaleItems}
-          onDelete={handleDelete}
-        />
-      )}
+  <SaleInvoiceDialog
+    open={invoiceDialogOpen}
+    onOpenChange={setInvoiceDialogOpen}
+    sale={saleForInvoice}
+    saleItems={saleForInvoice.items || []} // Usar los items cargados directamente
+    onDelete={handleDelete}
+  />
+)}
     </div>
   );
 }
