@@ -4,7 +4,7 @@ import { storage } from "./storage.js";
 import session from "express-session";
 import ConnectPgSimple from "connect-pg-simple";
 import { db, pool } from "./db.js";
-import { loginSchema, type User, type LoginCredentials, insertUserSchema, insertAssetSchema, insertSupplierSchema } from "../shared/schema.js";
+import { loginSchema, type User, type LoginCredentials, insertUserSchema, insertAssetSchema, insertSupplierSchema, sales } from "../shared/schema.js";
 import {
   insertIncomeSchema,
   insertExpenseSchema,
@@ -20,6 +20,7 @@ import {
   insertCompanySettingsSchema,
 } from "../shared/schema.js";
 import { z } from "zod";
+import { count, desc } from "drizzle-orm";
 
 // Extend Express session to include user
 declare module 'express-session' {
@@ -704,34 +705,71 @@ app.post("/api/purchases/enhanced", requireAuth, requireRole(['admin']), async (
     }
   });
 
-  app.post("/api/sales", requireAuth, requireRole(['admin', 'sales']), async (req, res) => {
-    try {
-      const { items, ...saleData } = req.body;
-      
-      // Convert saleDate string to Date if necessary
-      if (saleData.saleDate && typeof saleData.saleDate === 'string') {
-        saleData.saleDate = new Date(saleData.saleDate);
-      }
-      
-      // Validate sale data
-      const validatedSale = insertSaleSchema.parse(saleData);
-      
-      // Validate items data
-      const validatedItems = items.map((item: any) => 
-        insertSaleItemSchema.parse(item)
-      );
-
-      const sale = await storage.createSale(validatedSale, validatedItems);
-      res.status(201).json(sale);
-    } catch (error) {
-      console.error("Error creating sale:", error);
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid data", errors: error.errors });
-      }
-      const message = error instanceof Error ? error.message : "Failed to create sale";
-      res.status(500).json({ message });
+app.post("/api/sales", requireAuth, requireRole(['admin', 'sales']), async (req, res) => {
+  try {
+    console.log("Creating sale with data:", req.body); // Debug log
+    
+    const { items, ...saleData } = req.body;
+    
+    // Convert saleDate string to Date if necessary
+    if (saleData.saleDate && typeof saleData.saleDate === 'string') {
+      saleData.saleDate = new Date(saleData.saleDate);
     }
-  });
+    
+    // Validate sale data
+    console.log("Validating sale data:", saleData); // Debug log
+    const validatedSale = insertSaleSchema.parse(saleData);
+    
+    // Validate and process items data
+    console.log("Validating items data:", items); // Debug log
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ message: "No se encontraron productos en la venta" });
+    }
+    
+    const validatedItems = items.map((item: any, index: number) => {
+      try {
+        // Ensure required fields are present and properly typed
+        const processedItem = {
+          inventoryId: parseInt(item.inventoryId),
+          productName: String(item.productName || ''),
+          quantity: String(item.quantity || '0'),
+          unitPrice: String(item.unitPrice || '0'),
+          subtotal: String(item.subtotal || '0'),
+        };
+        
+        console.log(`Processed item ${index}:`, processedItem); // Debug log
+        
+        // Validate with schema
+        return insertSaleItemSchema.parse(processedItem);
+      } catch (itemError) {
+        console.error(`Error validating item ${index}:`, itemError);
+        throw new Error(`Error en el producto ${index + 1}: ${item.productName || 'Sin nombre'}`);
+      }
+    });
+
+    console.log("Creating sale with validated data"); // Debug log
+    const sale = await storage.createSale(validatedSale, validatedItems);
+    
+    console.log("Sale created successfully:", sale); // Debug log
+    res.status(201).json(sale);
+    
+  } catch (error) {
+    console.error("Error creating sale:", error);
+    
+    if (error instanceof z.ZodError) {
+      console.error("Zod validation errors:", error.errors);
+      return res.status(400).json({ 
+        message: "Datos inválidos", 
+        errors: error.errors,
+        details: error.errors.map(e => `${e.path.join('.')}: ${e.message}`)
+      });
+    }
+    
+    const message = error instanceof Error ? error.message : "Failed to create sale";
+    console.error("Final error message:", message);
+    res.status(500).json({ message });
+  }
+});
 
   app.put("/api/sales/:id", requireAuth, requireRole(['admin', 'sales']), async (req, res) => {
     try {
@@ -1138,15 +1176,47 @@ app.delete("/api/suppliers/:id", requireAuth, requireRole(['admin']), async (req
 // Get sale items
 app.get("/api/sales", requireAuth, async (req, res) => {
   try {
-    const sales = await db.query.sales.findMany({
+    const salesData = await db.query.sales.findMany({
       with: {
-        items: true, // 👈 Esto incluye los productos
+        items: true,
       },
+      orderBy: desc(sales.saleDate), // usa la tabla importada
+      limit: 10,
     });
-    res.json(sales);
+    res.json(salesData);
   } catch (error) {
     console.error("Error fetching sales:", error);
     res.status(500).json({ message: "Failed to fetch sales" });
+  }
+});
+
+app.get("/api/sales/history", requireAuth, async (req, res) => {
+  try {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 25;
+    const offset = (page - 1) * limit;
+
+    const [salesData, totalCount] = await Promise.all([
+      db.query.sales.findMany({
+        with: { items: true },
+        orderBy: desc(sales.saleDate), // ✅ Usa la tabla importada
+        limit,
+        offset,
+      }),
+      db.select({ count: count() }).from(sales) // ✅ Usa la tabla importada
+    ]);
+
+    res.json({
+      sales: salesData,
+      pagination: {
+        page,
+        limit,
+        total: totalCount[0].count,
+        totalPages: Math.ceil(totalCount[0].count / limit),
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch sales history" });
   }
 });
 

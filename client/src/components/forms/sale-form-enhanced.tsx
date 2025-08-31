@@ -101,14 +101,21 @@ export default function SaleFormEnhanced({ onSuccess }: SaleFormProps) {
     return () => window.removeEventListener('invoiceDialogClosed', handleDialogClosed);
   }, [form, onSuccess]);
 
+  const getSaleItemsForInvoice = (): SaleItem[] => {
+    if ((window as any).backupSaleItems) {
+      return (window as any).backupSaleItems;
+    }
+    return [];
+  };
+
   const createSaleMutation = useMutation({
     mutationFn: async (data: SaleFormData) => {
       const { items, ...saleData } = data;
       const response = await apiRequest("POST", "/api/sales", { ...saleData, items });
       return response;
     },
-    onSuccess: async (sale) => {
-      console.log("Sale created:", sale); // Debug log
+    onSuccess: async (sale: any) => {
+      console.log("Sale created:", sale);
       toast({
         title: "¡Venta registrada!",
         description: "La venta ha sido procesada exitosamente.",
@@ -116,98 +123,45 @@ export default function SaleFormEnhanced({ onSuccess }: SaleFormProps) {
       queryClient.invalidateQueries({ queryKey: ["/api/sales"] });
       queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
       
-      // Abrir diálogo de factura automáticamente
-      if (sale && sale.id) {
-        console.log("Setting up invoice dialog with sale:", sale);
-        const saleData: Sale = {
-          id: sale.id,
-          saleNumber: sale.saleNumber,
-          customerName: sale.customerName,
-          customerEmail: sale.customerEmail || null,
-          customerPhone: sale.customerPhone || null,
-          customerAddress: sale.customerAddress || null,
-          saleDate: new Date(sale.saleDate),
-          subtotal: sale.subtotal,
-          taxRate: sale.taxRate,
-          taxAmount: sale.taxAmount,
-          discountAmount: sale.discountAmount,
-          total: sale.total,
-          paymentMethod: sale.paymentMethod,
-          status: sale.status,
-          notes: sale.notes || null,
-          createdAt: new Date(sale.createdAt || new Date()),
-          updatedAt: new Date(sale.updatedAt || new Date())
-        };
-        
-        setCompletedSale(saleData);
-        setInvoiceDialogOpen(true);
-        console.log("Invoice dialog should open now");
-        
-        // Also store form items for backup in case API items fail
-        const formData = form.getValues();
-        const backupItems = formData.items.map((item, index) => ({
-          id: index + 1,
-          saleId: sale.id,
-          inventoryId: item.inventoryId,
-          productName: item.productName,
-          quantity: item.quantity,
-          unitPrice: item.unitPrice,
-          subtotal: item.subtotal,
-          createdAt: new Date()
-        }));
-        (window as any).backupSaleItems = backupItems;
-        
-        // Form will be reset when dialog closes via event listener
-      } else {
-        console.log("Sale data missing or incomplete:", sale);
-        // If no sale ID, still try to open dialog with form data
-        const formData = form.getValues();
-        const fallbackSale: Sale = {
-          id: -1, // Use -1 to indicate fallback mode
-          saleNumber: `TEMP-${Date.now()}`,
-          customerName: formData.customerName,
-          customerEmail: formData.customerEmail || null,
-          customerPhone: formData.customerPhone || null,
-          customerAddress: formData.customerAddress || null,
-          saleDate: formData.saleDate || new Date(),
-          subtotal: formData.subtotal,
-          taxRate: formData.taxRate,
-          taxAmount: formData.taxAmount,
-          discountAmount: formData.discountAmount,
-          total: formData.total,
-          paymentMethod: formData.paymentMethod,
-          status: "completed",
-          notes: formData.notes || null,
-          createdAt: new Date(),
-          updatedAt: new Date()
-        };
-        
-        setCompletedSale(fallbackSale);
-        setInvoiceDialogOpen(true);
-        console.log("Opening dialog with fallback data");
-        
-        // Store fallback sale items for the dialog
-        const fallbackItems = formData.items.map((item, index) => ({
-          id: index + 1,
-          saleId: -1,
-          inventoryId: item.inventoryId,
-          productName: item.productName,
-          quantity: item.quantity,
-          unitPrice: item.unitPrice,
-          subtotal: item.subtotal,
-          createdAt: new Date()
-        }));
-        
-        // Store fallback data temporarily for dialog access
-        (window as any).fallbackSaleItems = fallbackItems;
-        
-        // Form will be reset when dialog closes via event listener
-      }
+      // Crear sale data desde formulario
+      const formData = form.getValues();
+           
+      const saleData: Sale = {
+  id: sale?.id || Date.now(),
+  saleNumber: `V${Date.now()}`,
+  customerName: formData.customerName,
+  customerEmail: formData.customerEmail || null,
+  customerPhone: formData.customerPhone || null,
+  customerAddress: formData.customerAddress || null,
+  saleDate: formData.saleDate,
+  subtotal: formData.subtotal || "0",
+  taxRate: formData.taxRate || "0",
+  taxAmount: formData.taxAmount || "0", 
+  discountAmount: formData.discountAmount || "0",
+  total: formData.total || "0",
+  paymentMethod: formData.paymentMethod || "",
+  status: formData.status || "completed",
+  notes: formData.notes || null,
+  createdAt: new Date(),
+  updatedAt: new Date()
+};
+      setCompletedSale(saleData);
+      setInvoiceDialogOpen(true);
       
-      // Stop processing indicator
+      // Store items for dialog
+      const items = formData.items.map((item, index) => ({
+        id: index + 1,
+        saleId: saleData.id,
+        inventoryId: item.inventoryId,
+        productName: item.productName,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        subtotal: item.subtotal,
+        createdAt: new Date()
+      }));
+      (window as any).backupSaleItems = items;
+      
       setIsProcessing(false);
-      
-      // Form will be reset when dialog closes via event listener
     },
     onError: (error: any) => {
       setIsProcessing(false);
@@ -218,8 +172,6 @@ export default function SaleFormEnhanced({ onSuccess }: SaleFormProps) {
       });
     },
   });
-
-
 
   const addProduct = (product: InventoryItem) => {
     const existingItemIndex = fields.findIndex(item => item.inventoryId === product.id);
@@ -300,71 +252,81 @@ export default function SaleFormEnhanced({ onSuccess }: SaleFormProps) {
                     <FormItem>
                       <FormLabel>Nombre del Cliente *</FormLabel>
                       <FormControl>
-                        <Input placeholder="Nombre completo" {...field} />
+                        <Input placeholder="Nombre del cliente" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
 
-                <FormField
-                  control={form.control}
-                  name="customerEmail"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Email</FormLabel>
-                      <FormControl>
-                        <Input type="email" placeholder="correo@ejemplo.com" {...field} value={field.value || ""} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+               <FormField
+  control={form.control}
+  name="customerEmail"
+  render={({ field }) => (
+    <FormItem>
+      <FormLabel>Email</FormLabel>
+      <FormControl>
+        <Input 
+          {...field}
+          value={field.value || ""}
+          type="email" 
+          placeholder="correo@ejemplo.com" 
+        />
+      </FormControl>
+      <FormMessage />
+    </FormItem>
+  )}
+/>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="customerPhone"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Teléfono</FormLabel>
-                      <FormControl>
-                        <Input placeholder="+1234567890" {...field} value={field.value || ""} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+               <FormField
+  control={form.control}
+  name="customerPhone"
+  render={({ field }) => (
+    <FormItem>
+      <FormLabel>Teléfono</FormLabel>
+      <FormControl>
+        <Input 
+          {...field}
+          value={field.value || ""}
+          placeholder="(829) 123-4567" 
+        />
+      </FormControl>
+      <FormMessage />
+    </FormItem>
+  )}
+/>
 
-                <FormField
-                  control={form.control}
-                  name="saleDate"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Fecha de Venta</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="date"
-                          {...field}
-                          value={field.value ? new Date(field.value).toISOString().split('T')[0] : ''}
-                          onChange={(e) => field.onChange(new Date(e.target.value))}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+               <FormField
+  control={form.control}
+  name="customerAddress"
+  render={({ field }) => (
+    <FormItem>
+      <FormLabel>Dirección</FormLabel>
+      <FormControl>
+        <Input 
+          {...field}
+          value={field.value || ""}
+          placeholder="Dirección del cliente" 
+        />
+      </FormControl>
+      <FormMessage />
+    </FormItem>
+  )}
+/>
               </div>
 
               <FormField
                 control={form.control}
-                name="customerAddress"
+                name="saleDate"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Dirección</FormLabel>
+                    <FormLabel>Fecha de Venta</FormLabel>
                     <FormControl>
-                      <Textarea placeholder="Dirección completa" {...field} value={field.value || ""} rows={2} />
+                      <Input
+                        type="date"
+                        value={field.value instanceof Date ? field.value.toISOString().split('T')[0] : ''}
+                        onChange={(e) => field.onChange(new Date(e.target.value))}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -373,7 +335,7 @@ export default function SaleFormEnhanced({ onSuccess }: SaleFormProps) {
             </CardContent>
           </Card>
 
-          {/* Product Selection */}
+          {/* Products Section */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -383,21 +345,22 @@ export default function SaleFormEnhanced({ onSuccess }: SaleFormProps) {
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Product Search */}
-              <div>
-                <Label>Buscar y Agregar Productos</Label>
+              <div className="flex gap-2">
                 <Popover open={productSearchOpen} onOpenChange={setProductSearchOpen}>
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
-                      className="w-full justify-start mt-1"
                       role="combobox"
-                      aria-expanded={productSearchOpen}
+                      className="flex-1 justify-between"
                     >
-                      <Search className="mr-2 h-4 w-4" />
-                      {productSearchValue || "Buscar productos..."}
+                      <div className="flex items-center gap-2">
+                        <Search className="h-4 w-4" />
+                        {productSearchValue || "Buscar productos..."}
+                      </div>
+                      <Package className="h-4 w-4 opacity-50" />
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-full p-0" align="start">
+                  <PopoverContent className="w-80 p-0">
                     <Command>
                       <CommandInput
                         placeholder="Buscar productos..."
@@ -411,19 +374,20 @@ export default function SaleFormEnhanced({ onSuccess }: SaleFormProps) {
                             <CommandItem
                               key={product.id}
                               onSelect={() => addProduct(product)}
-                              className="cursor-pointer"
+                              className="flex items-center justify-between"
                             >
-                              <div className="flex items-center justify-between w-full">
+                              <div className="flex items-center gap-2">
+                                <Check className="h-4 w-4 opacity-0" />
                                 <div>
-                                  <p className="font-medium">{product.productName}</p>
-                                  <p className="text-sm text-gray-500">
-                                    Stock: {product.currentStock} {product.unit}
-                                  </p>
+                                  <div className="font-medium">{product.productName}</div>
+                                  <div className="text-sm text-gray-500">
+                                    Stock: {product.currentStock} | ${product.salePrice}
+                                  </div>
                                 </div>
-                                <Badge variant="secondary">
-                                  ${parseFloat(product.salePrice).toFixed(2)}
-                                </Badge>
                               </div>
+                              <Badge variant="secondary">
+                                ${product.salePrice}
+                              </Badge>
                             </CommandItem>
                           ))}
                         </CommandGroup>
@@ -433,104 +397,82 @@ export default function SaleFormEnhanced({ onSuccess }: SaleFormProps) {
                 </Popover>
               </div>
 
-              {/* Items List */}
+              {/* Products List */}
               {fields.length > 0 && (
                 <div className="space-y-3">
-                  <h4 className="font-medium">Productos Seleccionados:</h4>
-                  {fields.map((field, index) => (
-                    <div key={field.id} className="flex items-center gap-3 p-3 border rounded-lg bg-gray-50">
-                      <div className="flex-1">
-                        <p className="font-medium">{field.productName}</p>
-                        <p className="text-sm text-gray-600">${parseFloat(field.unitPrice).toFixed(2)} c/u</p>
+                  {fields.map((field, index) => {
+                    const product = inventory.find(p => p.id === field.inventoryId);
+                    const maxStock = product ? parseFloat(product.currentStock) : 0;
+
+                    return (
+                      <div key={field.id} className="flex gap-3 items-center bg-gray-50 p-3 rounded-lg">
+                        <div className="flex-1">
+                          <div className="font-medium">{field.productName}</div>
+                          <div className="text-sm text-gray-500">
+                            Stock disponible: {maxStock}
+                          </div>
+                        </div>
+                        
+                        <div className="w-24">
+                          <Label className="text-xs text-gray-500">Cantidad</Label>
+                          <Input
+                            type="number"
+                            min="1"
+                            max={maxStock}
+                            value={field.quantity}
+                            onChange={(e) => updateItemQuantity(index, e.target.value)}
+                            className="text-center"
+                          />
+                        </div>
+                        
+                        <div className="w-24">
+                          <Label className="text-xs text-gray-500">Precio</Label>
+                          <div className="text-center py-2 text-sm font-medium">
+                            ${field.unitPrice}
+                          </div>
+                        </div>
+                        
+                        <div className="w-24">
+                          <Label className="text-xs text-gray-500">Subtotal</Label>
+                          <div className="text-center py-2 text-sm font-bold">
+                            ${field.subtotal}
+                          </div>
+                        </div>
+                        
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => remove(index)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
-                      
-                      <div className="w-24">
-                        <Label className="text-xs">Cantidad</Label>
-                        <Input
-                          type="number"
-                          min="0.01"
-                          step="0.01"
-                          value={field.quantity}
-                          onChange={(e) => updateItemQuantity(index, e.target.value)}
-                          className="text-center"
-                        />
-                      </div>
-                      
-                      <div className="w-24 text-right">
-                        <p className="text-xs text-gray-600">Subtotal</p>
-                        <p className="font-medium">${parseFloat(field.subtotal).toFixed(2)}</p>
-                      </div>
-                      
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => remove(index)}
-                        className="text-red-600 hover:text-red-700"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
+                    );
+                  })}
+                </div>
+              )}
+
+              {fields.length === 0 && (
+                <div className="text-center py-8 text-gray-500">
+                  <Package className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                  <p>No hay productos agregados</p>
+                  <p className="text-sm">Busca y selecciona productos para agregar a la venta</p>
                 </div>
               )}
             </CardContent>
           </Card>
 
-          {/* Totals and Payment */}
+          {/* Payment and Totals */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Calculator className="h-5 w-5" />
-                Totales y Pago
+                <CreditCard className="h-5 w-5" />
+                Pago y Totales
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <FormField
-                  control={form.control}
-                  name="taxRate"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Impuesto (%)</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          {...field}
-                          onChange={(e) => {
-                            field.onChange(e.target.value);
-                            calculateTotals();
-                          }}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="discountAmount"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Descuento ($)</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          {...field}
-                          onChange={(e) => {
-                            field.onChange(e.target.value);
-                            calculateTotals();
-                          }}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
                 <FormField
                   control={form.control}
                   name="paymentMethod"
@@ -554,9 +496,55 @@ export default function SaleFormEnhanced({ onSuccess }: SaleFormProps) {
                     </FormItem>
                   )}
                 />
+
+                <FormField
+                  control={form.control}
+                  name="taxRate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Tasa de Impuesto (%)</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          value={field.value || ""}
+                          type="number"
+                          step="0.01"
+                          onChange={(e) => {
+                            field.onChange(e.target.value);
+                            calculateTotals();
+                          }}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="discountAmount"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Descuento ($)</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          value={field.value || ""}
+                          type="number"
+                          step="0.01"
+                          onChange={(e) => {
+                            field.onChange(e.target.value);
+                            calculateTotals();
+                          }}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
 
-              {/* Summary */}
+              {/* Totals Summary */}
               <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
@@ -587,7 +575,12 @@ export default function SaleFormEnhanced({ onSuccess }: SaleFormProps) {
                   <FormItem>
                     <FormLabel>Notas</FormLabel>
                     <FormControl>
-                      <Textarea placeholder="Observaciones adicionales..." {...field} rows={3} />
+                      <Textarea
+                        {...field}
+                        value={field.value || ""}
+                        rows={3}
+                        placeholder="Notas adicionales sobre la venta..."
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -620,11 +613,12 @@ export default function SaleFormEnhanced({ onSuccess }: SaleFormProps) {
       </Form>
 
       {/* Invoice Dialog */}
-      {completedSale && (
+      {invoiceDialogOpen && completedSale && (
         <SaleInvoiceDialog
           open={invoiceDialogOpen}
           onOpenChange={setInvoiceDialogOpen}
           sale={completedSale}
+          saleItems={getSaleItemsForInvoice()}
         />
       )}
     </div>

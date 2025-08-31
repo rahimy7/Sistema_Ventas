@@ -18,6 +18,7 @@ import UsersPage from "@/pages/users";
 import AssetsPage from "@/pages/AssetsPage"; // Importar la página de activos
 import NotFound from "@/pages/not-found";
 import SuppliersPage from "@/pages/SuppliersPage";
+import SalesHistoryPage from "@/pages/sales-history";
 
 function AuthenticatedRouter() {
   const { isAuthenticated, isLoading, user } = useAuth();
@@ -51,6 +52,11 @@ function AuthenticatedRouter() {
             <SalesPage />
           </ProtectedRoute>
         </Route>
+   <Route path="/ventas/historial">
+  <ProtectedRoute requiredRoles={['admin', 'sales']}>
+    <SalesHistoryPage />
+  </ProtectedRoute>
+</Route>
         <Route path="/compras">
           <ProtectedRoute requiredRoles={['admin']}>
             <PurchasesPage />

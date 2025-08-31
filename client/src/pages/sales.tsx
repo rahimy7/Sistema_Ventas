@@ -25,7 +25,8 @@ import {
   FileText,
   Printer,
   Package,
-  Trash2
+  Trash2,
+  History
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -65,12 +66,10 @@ export default function SalesPage() {
     },
   });
 
-  // Cargar ventas
+  // Cargar ventas (solo las últimas 10)
   const { data: sales = [], isLoading: salesLoading } = useQuery<SaleWithItems[]>({
     queryKey: ["/api/sales"],
   });
-
-
 
   // Estadísticas de ventas
   const salesStats = {
@@ -113,33 +112,32 @@ export default function SalesPage() {
     }
   };
 
-const handleViewInvoice = async (sale: SaleWithItems) => {
-  try {
-    console.log("Loading items for sale:", sale.id);
+  const handleViewInvoice = async (sale: SaleWithItems) => {
+    try {
+      console.log("Loading items for sale:", sale.id);
 
-    // Cargar items desde la API
-    const res = await apiRequest("GET", `/api/sales/${sale.id}/items`);
-    const items: SaleItem[] = await res.json();
-    console.log("Loaded items from API:", items);
+      // Cargar items desde la API
+      const res = await apiRequest("GET", `/api/sales/${sale.id}/items`);
+      const items: SaleItem[] = await res.json();
+      console.log("Loaded items from API:", items);
 
-    // Crear objeto de venta con items
-    const saleWithItems: SaleWithItems = {
-      ...sale,
-      items,
-    };
+      // Crear objeto de venta con items
+      const saleWithItems: SaleWithItems = {
+        ...sale,
+        items,
+      };
 
-    setSaleForInvoice(saleWithItems);
-    setInvoiceDialogOpen(true);
-  } catch (error) {
-    console.error("Error loading sale items:", error);
-    toast({
-      title: "Error",
-      description: "No se pudieron cargar los detalles de la venta.",
-      variant: "destructive",
-    });
-  }
-};
-
+      setSaleForInvoice(saleWithItems);
+      setInvoiceDialogOpen(true);
+    } catch (error) {
+      console.error("Error loading sale items:", error);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los detalles de la venta.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const handleDelete = (id: number) => {
     deleteSale.mutate(id);
@@ -249,10 +247,19 @@ const handleViewInvoice = async (sale: SaleWithItems) => {
         {/* Lista de Ventas */}
         <Card className="shadow-xl border-0 bg-white">
           <CardHeader className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
-            <CardTitle className="text-xl text-gray-900 flex items-center gap-2">
-              <FileText className="h-5 w-5 text-gray-600" />
-              Historial de Ventas
-            </CardTitle>
+            <div className="flex justify-between items-center">
+              <CardTitle className="text-xl text-gray-900 flex items-center gap-2">
+                <FileText className="h-5 w-5 text-gray-600" />
+                Ventas Recientes (Últimas 10)
+              </CardTitle>
+              <Button 
+                variant="outline" 
+                onClick={() => window.open('/ventas/historial', '_blank')}
+              >
+                <History className="h-4 w-4 mr-2" />
+                Ver Historial Completo
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="p-0">
             {salesLoading ? (
@@ -380,14 +387,14 @@ const handleViewInvoice = async (sale: SaleWithItems) => {
 
       {/* Diálogo de factura de venta */}
       {saleForInvoice && (
-  <SaleInvoiceDialog
-    open={invoiceDialogOpen}
-    onOpenChange={setInvoiceDialogOpen}
-    sale={saleForInvoice}
-    saleItems={saleForInvoice.items || []} // Usar los items cargados directamente
-    onDelete={handleDelete}
-  />
-)}
+        <SaleInvoiceDialog
+          open={invoiceDialogOpen}
+          onOpenChange={setInvoiceDialogOpen}
+          sale={saleForInvoice}
+          saleItems={saleForInvoice.items || []}
+          onDelete={handleDelete}
+        />
+      )}
     </div>
   );
 }

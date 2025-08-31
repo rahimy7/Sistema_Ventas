@@ -820,83 +820,108 @@ async getPurchaseItems(purchaseId: number) {
     return sale;
   }
 
-  async createSale(saleData: InsertSale, itemsData: InsertSaleItem[]): Promise<Sale> {
-    const maxRetries = 3;
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        // Wrap entire sale creation in a transaction to avoid partial saves
-        return await db.transaction(async (tx) => {
-          // Generate a new sale number
-          const saleNumber = await this.generateSaleNumber();
+async createSale(saleData: InsertSale, itemsData: InsertSaleItem[]): Promise<Sale> {
+  try {
+    console.log("Storage: Creating sale with data:", saleData);
+    console.log("Storage: Sale items:", itemsData);
+    
+    return await db.transaction(async (tx) => {
+      // Generate a new sale number
+      const saleNumber = await this.generateSaleNumber();
+      console.log("Storage: Generated sale number:", saleNumber);
 
-          // Create sale header
-          const [sale] = await tx
-            .insert(sales)
-            .values({
-              ...saleData,
-              saleNumber,
-            })
-            .returning();
+      // Create sale header
+      const [sale] = await tx
+        .insert(sales)
+        .values({
+          ...saleData,
+          saleNumber,
+        })
+        .returning();
 
-          // Create sale items and adjust inventory atomically
-          for (const itemData of itemsData) {
-            // Insert sale item
-            await tx.insert(saleItems).values({
-              ...itemData,
-              saleId: sale.id,
-            });
+      console.log("Storage: Sale header created:", sale.id);
 
-            // Fetch current inventory information
-            const [invItem] = await tx
-              .select()
-              .from(inventory)
-              .where(eq(inventory.id, itemData.inventoryId));
+      // Create sale items and adjust inventory atomically
+      for (let i = 0; i < itemsData.length; i++) {
+        const itemData = itemsData[i];
+        console.log(`Storage: Processing item ${i + 1}:`, itemData);
+        
+        try {
+          // Insert sale item
+          const [saleItem] = await tx.insert(saleItems).values({
+            saleId: sale.id,
+            inventoryId: itemData.inventoryId,
+            productName: itemData.productName,
+            quantity: itemData.quantity,
+            unitPrice: itemData.unitPrice,
+            subtotal: itemData.subtotal,
+          }).returning();
+          
+          console.log(`Storage: Sale item ${i + 1} created:`, saleItem.id);
 
-            if (!invItem) {
-              throw new Error("Inventory item not found");
-            }
+          // Fetch current inventory information
+          const [invItem] = await tx
+            .select()
+            .from(inventory)
+            .where(eq(inventory.id, itemData.inventoryId));
 
-            const quantityNum = Number(itemData.quantity);
-            const previousStock = Number(invItem.currentStock);
-            const newStock = previousStock - quantityNum;
-
-            // Record stock movement
-            await tx.insert(stockMovements).values({
-              inventoryId: itemData.inventoryId,
-              movementType: "out",
-              quantity: quantityNum.toString(),
-              previousStock: previousStock.toString(),
-              newStock: newStock.toString(),
-              reason: "Venta",
-              reference: `Venta #${saleNumber}`,
-              createdBy: "system",
-            });
-
-            // Update inventory stock
-            await tx
-              .update(inventory)
-              .set({
-                currentStock: newStock.toString(),
-                updatedAt: new Date(),
-              })
-              .where(eq(inventory.id, itemData.inventoryId));
+          if (!invItem) {
+            throw new Error(`Producto con ID ${itemData.inventoryId} no encontrado en inventario`);
           }
 
-          return sale;
-        });
-      } catch (error) {
-        console.error(`createSale attempt ${attempt} failed:`, error);
-        if (attempt === maxRetries) {
-          throw new Error('Database connection failed while creating sale');
-        }
-        // Exponential backoff before retrying
-        await new Promise((resolve) => setTimeout(resolve, 500 * attempt));
-      }
-    }
+          const quantityNum = Number(itemData.quantity);
+          const previousStock = Number(invItem.currentStock);
+          
+          if (previousStock < quantityNum) {
+            throw new Error(`Stock insuficiente para ${itemData.productName}. Stock disponible: ${previousStock}, solicitado: ${quantityNum}`);
+          }
+          
+          const newStock = previousStock - quantityNum;
+          
+          console.log(`Storage: Updating inventory ${itemData.inventoryId}: ${previousStock} -> ${newStock}`);
 
-    // Should never reach here
-    throw new Error('Unable to create sale');
+          // Record stock movement
+          await tx.insert(stockMovements).values({
+            inventoryId: itemData.inventoryId,
+            movementType: "out",
+            quantity: quantityNum.toString(),
+            previousStock: previousStock.toString(),
+            newStock: newStock.toString(),
+            reason: "Venta",
+            reference: `Venta #${saleNumber}`,
+            createdBy: "system",
+          });
+
+          // Update inventory stock
+          await tx
+            .update(inventory)
+            .set({
+              currentStock: newStock.toString(),
+              updatedAt: new Date(),
+            })
+            .where(eq(inventory.id, itemData.inventoryId));
+            
+          console.log(`Storage: Inventory updated for item ${itemData.inventoryId}`);
+            
+        } catch (itemError) {
+          console.error(`Storage: Error processing item ${i + 1}:`, itemError);
+          throw itemError; // Re-throw to fail the entire transaction
+        }
+      }
+
+      console.log("Storage: Sale creation completed successfully");
+      return sale;
+    });
+    
+  } catch (error) {
+    console.error("Storage: Sale creation failed:", error);
+    if (error instanceof Error) {
+      throw error; // Preserve original error message
+    } else {
+      throw new Error('Error desconocido al crear la venta');
+    }
   }
+}
 
   async updateSale(id: number, saleData: Partial<InsertSale>): Promise<Sale> {
     const [updatedSale] = await db
@@ -934,31 +959,39 @@ async getPurchaseItems(purchaseId: number) {
     return await db.select().from(saleItems).where(eq(saleItems.saleId, saleId));
   }
 
-  async generateSaleNumber(): Promise<string> {
-    try {
-      const now = new Date();
-      const year = now.getFullYear();
-      const month = String(now.getMonth() + 1).padStart(2, '0');
+async generateSaleNumber(): Promise<string> {
+  try {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
 
-      const [lastSale] = await db
+    // Intentar consulta con timeout más corto
+    const [lastSale] = await Promise.race([
+      db
         .select({ saleNumber: sales.saleNumber })
         .from(sales)
         .where(like(sales.saleNumber, `V${year}${month}%`))
         .orderBy(desc(sales.saleNumber))
-        .limit(1);
+        .limit(1),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Query timeout')), 3000)
+      )
+    ]) as any[];
 
-      let nextNumber = 1;
-      if (lastSale) {
-        const lastNumber = parseInt(lastSale.saleNumber.slice(-4));
-        nextNumber = lastNumber + 1;
-      }
-
-      return `V${year}${month}${String(nextNumber).padStart(4, '0')}`;
-    } catch (error) {
-      console.error('generateSaleNumber error:', error);
-      throw new Error('Database connection failed while generating sale number');
+    let nextNumber = 1;
+    if (lastSale) {
+      const lastNumber = parseInt(lastSale.saleNumber.slice(-4));
+      nextNumber = lastNumber + 1;
     }
+
+    return `V${year}${month}${String(nextNumber).padStart(4, '0')}`;
+  } catch (error) {
+    console.error('generateSaleNumber error:', error);
+    // Fallback: usar timestamp si falla la DB
+    const timestamp = Date.now().toString().slice(-6);
+    return `V${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}${timestamp}`;
   }
+}
 
 
   // Dashboard analytics
