@@ -169,6 +169,10 @@ toggleSupplierStatus(id: number): Promise<Supplier>;
   createUser(user: InsertUser): Promise<User>;
   authenticateUser(credentials: LoginCredentials): Promise<User | null>;
   updateUserLastLogin(id: number): Promise<void>;
+
+  // Quote item operations
+  deleteQuoteItems(quoteId: number): Promise<void>;
+  createQuoteItem(quoteId: number, item: InsertQuoteItem): Promise<QuoteItem>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1172,6 +1176,18 @@ async toggleSupplierStatus(id: number): Promise<Supplier> {
     return quote;
   }
 
+  async deleteQuoteItems(quoteId: number): Promise<void> {
+    await db.delete(quoteItems).where(eq(quoteItems.quoteId, quoteId));
+  }
+
+  async createQuoteItem(quoteId: number, itemData: InsertQuoteItem): Promise<QuoteItem> {
+    const [item] = await db
+      .insert(quoteItems)
+      .values({ ...itemData, quoteId })
+      .returning();
+    return item;
+  }
+
   async createQuote(quoteData: InsertQuote, itemsData: InsertQuoteItem[]): Promise<Quote> {
     // Generate quote number
     const quoteNumber = await this.generateQuoteNumber();
@@ -1183,10 +1199,7 @@ async toggleSupplierStatus(id: number): Promise<Supplier> {
     
     // Create quote items
     for (const itemData of itemsData) {
-      await db.insert(quoteItems).values({
-        ...itemData,
-        quoteId: quote.id
-      });
+      await this.createQuoteItem(quote.id, itemData);
     }
 
     return quote;
@@ -1203,7 +1216,7 @@ async toggleSupplierStatus(id: number): Promise<Supplier> {
 
   async deleteQuote(id: number): Promise<void> {
     // Delete quote items and quote
-    await db.delete(quoteItems).where(eq(quoteItems.quoteId, id));
+    await this.deleteQuoteItems(id);
     await db.delete(quotes).where(eq(quotes.id, id));
   }
 
