@@ -329,6 +329,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to delete purchase" });
     }
   });
+  app.get("/api/purchases/:id/items", requireAuth, async (req, res) => {
+  try {
+    const purchaseId = parseInt(req.params.id);
+    
+    if (isNaN(purchaseId)) {
+      return res.status(400).json({ message: "Invalid purchase ID" });
+    }
+
+    const items = await storage.getPurchaseItems(purchaseId);
+    res.json(items);
+  } catch (error) {
+    console.error("Error fetching purchase items:", error);
+    res.status(500).json({ message: "Failed to fetch purchase items" });
+  }
+});
 
   // Enhanced purchase endpoint for multiple items
 app.post("/api/purchases/enhanced", requireAuth, requireRole(['admin']), async (req, res) => {
@@ -650,16 +665,7 @@ app.post("/api/purchases/enhanced", requireAuth, requireRole(['admin']), async (
     }
   });
 
-  // Sales routes
-  app.get("/api/sales", requireAuth, async (req, res) => {
-    try {
-      const sales = await storage.getSales();
-      res.json(sales);
-    } catch (error) {
-      console.error("Error fetching sales:", error);
-      res.status(500).json({ message: "Failed to fetch sales" });
-    }
-  });
+
 
   app.get("/api/sales/:id", requireAuth, async (req, res) => {
     try {

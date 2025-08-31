@@ -1,11 +1,15 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 import SaleFormEnhanced from "@/components/forms/sale-form-enhanced";
 import SaleInvoiceDialog from "@/components/invoice/sale-invoice-dialog";
 import HomeButton from "@/components/ui/home-button";
@@ -20,7 +24,8 @@ import {
   Eye,
   FileText,
   Printer,
-  Package
+  Package,
+  Trash2
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -36,6 +41,29 @@ export default function SalesPage() {
   const [selectedSale, setSelectedSale] = useState<SaleWithItems | null>(null);
   const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
   const [saleForInvoice, setSaleForInvoice] = useState<SaleWithItems | null>(null);
+  
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  // Mutation para eliminar venta
+  const deleteSale = useMutation({
+    mutationFn: (id: number) => apiRequest("DELETE", `/api/sales/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sales"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
+      toast({
+        title: "Venta eliminada",
+        description: "La venta ha sido eliminada exitosamente y el inventario ha sido restaurado.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error?.message || "No se pudo eliminar la venta.",
+        variant: "destructive",
+      });
+    },
+  });
 
   // Cargar ventas
   const { data: sales = [], isLoading: salesLoading } = useQuery<SaleWithItems[]>({
@@ -89,6 +117,15 @@ export default function SalesPage() {
     }
   };
 
+  const handleViewInvoice = (sale: SaleWithItems) => {
+    setSaleForInvoice(sale);
+    setInvoiceDialogOpen(true);
+  };
+
+  const handleDelete = (id: number) => {
+    deleteSale.mutate(id);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="space-y-6 p-4">
@@ -115,7 +152,9 @@ export default function SalesPage() {
                   <DialogTitle className="text-xl">Registrar Nueva Venta</DialogTitle>
                 </DialogHeader>
                 <div className="flex-1 overflow-y-auto">
-                  <SaleFormEnhanced onSuccess={() => setDialogOpen(false)} />
+                  <SaleFormEnhanced 
+                    onSuccess={() => setDialogOpen(false)}
+                  />
                 </div>
               </DialogContent>
             </Dialog>
@@ -124,13 +163,13 @@ export default function SalesPage() {
 
         {/* Estadísticas */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <Card className="bg-gradient-to-br from-green-50 to-emerald-100 border-green-200 shadow-lg hover:shadow-xl transition-all duration-300">
+          <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200 shadow-lg hover:shadow-xl transition-all duration-300">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div className="space-y-2">
-                  <p className="text-green-700 font-medium">Ventas Totales</p>
+                  <p className="text-green-700 font-medium">Total Ventas</p>
                   <p className="text-3xl font-bold text-green-900">{salesStats.totalSales}</p>
-                  <p className="text-sm text-green-600">Todas las ventas</p>
+                  <p className="text-sm text-green-600">Ventas realizadas</p>
                 </div>
                 <div className="h-14 w-14 bg-green-500 rounded-2xl flex items-center justify-center">
                   <ShoppingCart className="h-7 w-7 text-white" />
@@ -143,9 +182,9 @@ export default function SalesPage() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div className="space-y-2">
-                  <p className="text-blue-700 font-medium">Ventas de Hoy</p>
+                  <p className="text-blue-700 font-medium">Ventas Hoy</p>
                   <p className="text-3xl font-bold text-blue-900">{salesStats.todaysSales}</p>
-                  <p className="text-sm text-blue-600">Ventas del día</p>
+                  <p className="text-sm text-blue-600">Del día actual</p>
                 </div>
                 <div className="h-14 w-14 bg-blue-500 rounded-2xl flex items-center justify-center">
                   <Calendar className="h-7 w-7 text-white" />
@@ -154,17 +193,15 @@ export default function SalesPage() {
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100 border-emerald-200 shadow-lg hover:shadow-xl transition-all duration-300">
+          <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 shadow-lg hover:shadow-xl transition-all duration-300">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div className="space-y-2">
-                  <p className="text-emerald-700 font-medium">Ingresos Totales</p>
-                  <p className="text-3xl font-bold text-emerald-900">
-                    ${salesStats.totalRevenue.toLocaleString('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                  </p>
-                  <p className="text-sm text-emerald-600">Total generado</p>
+                  <p className="text-purple-700 font-medium">Ingresos Totales</p>
+                  <p className="text-3xl font-bold text-purple-900">${salesStats.totalRevenue.toFixed(2)}</p>
+                  <p className="text-sm text-purple-600">Suma de ventas</p>
                 </div>
-                <div className="h-14 w-14 bg-emerald-500 rounded-2xl flex items-center justify-center">
+                <div className="h-14 w-14 bg-purple-500 rounded-2xl flex items-center justify-center">
                   <DollarSign className="h-7 w-7 text-white" />
                 </div>
               </div>
@@ -176,9 +213,7 @@ export default function SalesPage() {
               <div className="flex items-center justify-between">
                 <div className="space-y-2">
                   <p className="text-orange-700 font-medium">Ticket Promedio</p>
-                  <p className="text-3xl font-bold text-orange-900">
-                    ${salesStats.averageTicket.toLocaleString('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                  </p>
+                  <p className="text-3xl font-bold text-orange-900">${salesStats.averageTicket.toFixed(2)}</p>
                   <p className="text-sm text-orange-600">Por venta</p>
                 </div>
                 <div className="h-14 w-14 bg-orange-500 rounded-2xl flex items-center justify-center">
@@ -190,321 +225,145 @@ export default function SalesPage() {
         </div>
 
         {/* Lista de Ventas */}
-        <Card className="shadow-xl border-0">
-          <CardHeader className="bg-gradient-to-r from-green-50 to-emerald-100 border-b border-green-200">
+        <Card className="shadow-xl border-0 bg-white">
+          <CardHeader className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
             <CardTitle className="text-xl text-gray-900 flex items-center gap-2">
-              <ShoppingCart className="h-5 w-5 text-green-600" />
-              Lista de Ventas
+              <FileText className="h-5 w-5 text-gray-600" />
+              Historial de Ventas
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             {salesLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="text-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto"></div>
-                  <p className="mt-4 text-gray-600">Cargando ventas...</p>
-                </div>
+              <div className="flex justify-center items-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+              </div>
+            ) : sales.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-gray-500">
+                <ShoppingCart className="h-12 w-12 mb-4 opacity-50" />
+                <p className="text-lg font-medium">No hay ventas registradas</p>
+                <p className="text-sm">Comienza registrando tu primera venta</p>
               </div>
             ) : (
               <ScrollArea className="h-[600px]">
-                <div className="space-y-2 p-4">
-                  {sales.map((sale) => (
-                    <div
-                      key={sale.id}
-                      className="group flex items-center justify-between p-4 bg-white hover:bg-gray-50 rounded-lg border border-gray-200 hover:border-green-300 transition-all duration-200"
-                    >
-                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 flex-1">
-                        <div className="space-y-1">
-                          <p className="text-sm font-semibold text-gray-900">
-                            #{sale.saleNumber}
-                          </p>
-                          <p className="text-sm text-gray-600 flex items-center gap-1">
-                            <User className="h-3 w-3" />
-                            {sale.customerName}
-                          </p>
-                        </div>
-
-                        <div className="space-y-1">
-                          <p className="text-sm font-medium text-gray-900">
-                            {format(new Date(sale.saleDate), "PPP", { locale: es })}
-                          </p>
-                          <p className="text-xs text-gray-600">
-                            {format(new Date(sale.saleDate), "HH:mm")}
-                          </p>
-                        </div>
-
-                        <div className="space-y-1">
-                          <p className="text-sm font-medium text-gray-900 flex items-center gap-1">
-                            <CreditCard className="h-3 w-3" />
-                            {getPaymentMethodText(sale.paymentMethod)}
-                          </p>
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-gray-50 hover:bg-gray-50">
+                      <TableHead className="font-semibold text-gray-900">Fecha</TableHead>
+                      <TableHead className="font-semibold text-gray-900">Cliente</TableHead>
+                      <TableHead className="font-semibold text-gray-900">Estado</TableHead>
+                      <TableHead className="font-semibold text-gray-900">Método de Pago</TableHead>
+                      <TableHead className="font-semibold text-gray-900">Total</TableHead>
+                      <TableHead className="font-semibold text-gray-900 text-center">Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {sales.map((sale) => (
+                      <TableRow key={sale.id} className="hover:bg-gray-50 transition-colors">
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Calendar className="h-4 w-4 text-gray-500" />
+                            {format(new Date(sale.saleDate), 'dd MMM yyyy', { locale: es })}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <User className="h-4 w-4 text-gray-500" />
+                            <span className="font-medium">{sale.customerName || 'Cliente sin nombre'}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
                           <Badge className={`text-xs ${getStatusColor(sale.status)}`}>
                             {getStatusText(sale.status)}
                           </Badge>
-                        </div>
-
-                        <div className="space-y-1">
-                          <p className="text-lg font-bold text-green-600">
-                            ${Number(sale.total).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </p>
-                          <p className="text-xs text-gray-600">Total</p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setSelectedSale(sale)}
-                          title="Ver detalles"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setSaleForInvoice(sale);
-                            setInvoiceDialogOpen(true);
-                          }}
-                          title="Imprimir factura"
-                          className="bg-blue-50 hover:bg-blue-100 border-blue-200"
-                        >
-                          <Printer className="h-4 w-4 text-blue-600" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <CreditCard className="h-4 w-4 text-gray-500" />
+                            <Badge variant="outline" className="text-xs">
+                              {getPaymentMethodText(sale.paymentMethod)}
+                            </Badge>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <DollarSign className="h-4 w-4 text-green-600" />
+                            <span className="font-semibold text-green-700">
+                              ${Number(sale.total).toFixed(2)}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center justify-center gap-2">
+                            <Button
+                              onClick={() => handleViewInvoice(sale)}
+                              size="sm"
+                              variant="outline"
+                              className="h-8 px-3 hover:bg-green-50 hover:border-green-300 hover:text-green-700 transition-colors"
+                            >
+                              <Eye className="h-4 w-4 mr-1" />
+                              Ver
+                            </Button>
+                            <Button
+                              onClick={() => handleViewInvoice(sale)}
+                              size="sm"
+                              variant="outline"
+                              className="h-8 px-3 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition-colors"
+                            >
+                              <Printer className="h-4 w-4 mr-1" />
+                              Imprimir
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-8 px-3 text-red-600 hover:text-red-700 hover:bg-red-50 hover:border-red-300 transition-colors"
+                                >
+                                  <Trash2 className="h-4 w-4 mr-1" />
+                                  Eliminar
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>¿Eliminar venta?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Esta acción no se puede deshacer. La venta del cliente "{sale.customerName || 'Sin nombre'}" 
+                                    por ${Number(sale.total).toFixed(2)} será eliminada permanentemente.
+                                    <br /><br />
+                                    <strong>Nota:</strong> Los productos vendidos serán devueltos automáticamente al inventario.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => handleDelete(sale.id)}
+                                    className="bg-red-600 hover:bg-red-700"
+                                  >
+                                    Eliminar Venta
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </ScrollArea>
             )}
           </CardContent>
         </Card>
       </div>
 
-      {/* Sale Detail Dialog */}
-      {selectedSale && (
-        <Dialog open={!!selectedSale} onOpenChange={(open) => !open && setSelectedSale(null)}>
-          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="text-xl font-semibold flex items-center gap-2">
-                <Eye className="h-5 w-5 text-blue-600" />
-                Detalles de la Venta #{selectedSale.saleNumber}
-              </DialogTitle>
-            </DialogHeader>
-
-            <div className="space-y-6">
-              {/* Información del Cliente */}
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <User className="h-5 w-5 text-green-600" />
-                    Información del Cliente
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-sm font-medium text-gray-500">Nombre</p>
-                      <p className="text-base font-semibold text-gray-900">{selectedSale.customerName}</p>
-                    </div>
-                    {selectedSale.customerEmail && (
-                      <div>
-                        <p className="text-sm font-medium text-gray-500">Email</p>
-                        <p className="text-base text-gray-900">{selectedSale.customerEmail}</p>
-                      </div>
-                    )}
-                    {selectedSale.customerPhone && (
-                      <div>
-                        <p className="text-sm font-medium text-gray-500">Teléfono</p>
-                        <p className="text-base text-gray-900">{selectedSale.customerPhone}</p>
-                      </div>
-                    )}
-                    {selectedSale.customerAddress && (
-                      <div>
-                        <p className="text-sm font-medium text-gray-500">Dirección</p>
-                        <p className="text-base text-gray-900">{selectedSale.customerAddress}</p>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Información de la Venta */}
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <ShoppingCart className="h-5 w-5 text-blue-600" />
-                    Información de la Venta
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                      <p className="text-sm font-medium text-gray-500">Fecha</p>
-                      <p className="text-base font-semibold text-gray-900">
-                        {format(new Date(selectedSale.saleDate), "PPP", { locale: es })}
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        {format(new Date(selectedSale.saleDate), "HH:mm")}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-500">Método de Pago</p>
-                      <Badge variant="outline" className="mt-1">
-                        {getPaymentMethodText(selectedSale.paymentMethod)}
-                      </Badge>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-500">Estado</p>
-                      <Badge className={`mt-1 ${getStatusColor(selectedSale.status)}`}>
-                        {getStatusText(selectedSale.status)}
-                      </Badge>
-                    </div>
-                  </div>
-                  {selectedSale.notes && (
-                    <div>
-                      <p className="text-sm font-medium text-gray-500">Notas</p>
-                      <p className="text-base text-gray-900 bg-gray-50 p-2 rounded">{selectedSale.notes}</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Productos Vendidos */}
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Package className="h-5 w-5 text-orange-600" />
-                    Productos Vendidos
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {selectedSaleItems && selectedSaleItems.length > 0 ? (
-                    <div className="space-y-3">
-                      {selectedSaleItems.map((item: SaleItem, index: number) => (
-                        <div key={index} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                          <div className="flex-1">
-                            <p className="font-medium text-gray-900">{item.productName}</p>
-                            <p className="text-sm text-gray-600">
-                              {item.quantity} x ${Number(item.unitPrice).toLocaleString('es-ES', {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2
-                              })}
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <p className="font-semibold text-gray-900">
-                              ${Number(item.subtotal).toLocaleString('es-ES', {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2
-                              })}
-                            </p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-gray-500 text-center py-4">No hay productos registrados</p>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Resumen de Totales */}
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <DollarSign className="h-5 w-5 text-green-600" />
-                    Resumen de Totales
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600">Subtotal:</span>
-                      <span className="font-medium">
-                        ${Number(selectedSale.subtotal).toLocaleString('es-ES', {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2
-                        })}
-                      </span>
-                    </div>
-
-                    {Number(selectedSale.taxAmount) > 0 && (
-                      <div className="flex justify-between items-center">
-                        <span className="text-gray-600">
-                          Impuestos ({Number(selectedSale.taxRate)}%):
-                        </span>
-                        <span className="font-medium">
-                          ${Number(selectedSale.taxAmount).toLocaleString('es-ES', {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2
-                          })}
-                        </span>
-                      </div>
-                    )}
-
-                    {Number(selectedSale.discountAmount) > 0 && (
-                      <div className="flex justify-between items-center">
-                        <span className="text-gray-600">Descuento:</span>
-                        <span className="font-medium text-red-600">
-                          -${Number(selectedSale.discountAmount).toLocaleString('es-ES', {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2
-                          })}
-                        </span>
-                      </div>
-                    )}
-
-                    <div className="border-t pt-3">
-                      <div className="flex justify-between items-center">
-                        <span className="text-lg font-semibold text-gray-900">Total:</span>
-                        <span className="text-xl font-bold text-green-600">
-                          ${Number(selectedSale.total).toLocaleString('es-ES', {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2
-                          })}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Botones de Acción */}
-              <div className="flex justify-end space-x-3 pt-4 border-t">
-                <Button
-                  variant="outline"
-                  onClick={() => setSelectedSale(null)}
-                >
-                  Cerrar
-                </Button>
-                <Button
-                  onClick={() => {
-                    setSaleForInvoice(selectedSale);
-                    setInvoiceDialogOpen(true);
-                    setSelectedSale(null);
-                  }}
-                  className="bg-blue-600 hover:bg-blue-700"
-                >
-                  <Printer className="h-4 w-4 mr-2" />
-                  Imprimir Factura
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
-
-      {/* Invoice Dialog */}
+      {/* Diálogo de factura de venta */}
       {saleForInvoice && (
         <SaleInvoiceDialog
           open={invoiceDialogOpen}
-          onOpenChange={(open) => {
-            setInvoiceDialogOpen(open);
-            if (!open) setSaleForInvoice(null);
-          }}
+          onOpenChange={setInvoiceDialogOpen}
           sale={saleForInvoice}
+          saleItems={selectedSaleItems}
+          onDelete={handleDelete}
         />
       )}
     </div>

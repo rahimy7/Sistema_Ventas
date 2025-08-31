@@ -1,12 +1,16 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 import EnhancedPurchaseForm from "@/components/forms/enhanced-purchase-form";
+import PurchaseInvoiceDialog from "@/components/invoice/purchase-invoice-dialog";
 import HomeButton from "@/components/ui/home-button";
 import { 
   ShoppingBag, 
@@ -17,7 +21,10 @@ import {
   Building,
   CreditCard,
   FileText,
-  Package
+  Package,
+  Eye,
+  Printer,
+  Trash2
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -25,6 +32,33 @@ import { type Purchase } from "@shared/schema";
 
 export default function PurchasesPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
+  const [selectedPurchase, setSelectedPurchase] = useState<Purchase | null>(null);
+  
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  // Mutation para eliminar compra
+  const deletePurchase = useMutation({
+    mutationFn: (id: number) => apiRequest("DELETE", `/api/purchases/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/purchases"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/assets"] });
+      toast({
+        title: "Compra eliminada",
+        description: "La compra ha sido eliminada exitosamente.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error?.message || "No se pudo eliminar la compra.",
+        variant: "destructive",
+      });
+    },
+  });
+
 
   // Cargar compras
   const { data: purchases = [], isLoading: purchasesLoading } = useQuery<Purchase[]>({
@@ -40,7 +74,8 @@ export default function PurchasesPage() {
       return purchaseDate.toDateString() === today.toDateString();
     }).length,
     totalAmount: purchases.reduce((sum, purchase) => sum + Number(purchase.totalAmount), 0),
-    averagePurchase: purchases.length > 0 ? purchases.reduce((sum, purchase) => sum + Number(purchase.totalAmount), 0) / purchases.length : 0,
+    averagePurchase: purchases.length > 0 ? 
+      purchases.reduce((sum, purchase) => sum + Number(purchase.totalAmount), 0) / purchases.length : 0,
   };
 
   const getPaymentMethodText = (method: string) => {
@@ -52,6 +87,15 @@ export default function PurchasesPage() {
       case "credit": return "Crédito";
       default: return method;
     }
+  };
+
+  const handleViewInvoice = (purchase: Purchase) => {
+    setSelectedPurchase(purchase);
+    setInvoiceDialogOpen(true);
+  };
+
+  const handleDelete = (id: number) => {
+    deletePurchase.mutate(id);
   };
 
   return (
@@ -96,9 +140,9 @@ export default function PurchasesPage() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div className="space-y-2">
-                  <p className="text-orange-700 font-medium">Compras Totales</p>
+                  <p className="text-orange-700 font-medium">Total Compras</p>
                   <p className="text-3xl font-bold text-orange-900">{purchaseStats.totalPurchases}</p>
-                  <p className="text-sm text-orange-600">Todas las compras</p>
+                  <p className="text-sm text-orange-600">Registros totales</p>
                 </div>
                 <div className="h-14 w-14 bg-orange-500 rounded-2xl flex items-center justify-center">
                   <ShoppingBag className="h-7 w-7 text-white" />
@@ -111,9 +155,9 @@ export default function PurchasesPage() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div className="space-y-2">
-                  <p className="text-blue-700 font-medium">Compras Hoy</p>
+                  <p className="text-blue-700 font-medium">Hoy</p>
                   <p className="text-3xl font-bold text-blue-900">{purchaseStats.todaysPurchases}</p>
-                  <p className="text-sm text-blue-600">Compras del día</p>
+                  <p className="text-sm text-blue-600">Compras de hoy</p>
                 </div>
                 <div className="h-14 w-14 bg-blue-500 rounded-2xl flex items-center justify-center">
                   <Calendar className="h-7 w-7 text-white" />
@@ -167,67 +211,128 @@ export default function PurchasesPage() {
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600"></div>
               </div>
             ) : purchases.length === 0 ? (
-              <div className="text-center py-12">
-                <ShoppingBag className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-600 text-lg">No hay compras registradas</p>
-                <p className="text-gray-500">¡Registra tu primera compra para empezar!</p>
+              <div className="flex flex-col items-center justify-center py-12 text-gray-500">
+                <ShoppingBag className="h-12 w-12 mb-4 opacity-50" />
+                <p className="text-lg font-medium">No hay compras registradas</p>
+                <p className="text-sm">Comienza registrando tu primera compra</p>
               </div>
             ) : (
-              <ScrollArea className="h-96">
-                <div className="space-y-2 p-4">
-                  {purchases.map((purchase) => (
-                    <div
-                      key={purchase.id}
-                      className="flex items-center justify-between p-4 bg-gradient-to-r from-white to-gray-50 border border-gray-200 rounded-xl hover:shadow-md transition-all duration-200 cursor-pointer group"
-                    >
-                      <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-4">
-                        <div className="space-y-1">
+              <ScrollArea className="h-[600px]">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-gray-50 hover:bg-gray-50">
+                      <TableHead className="font-semibold text-gray-900">Fecha</TableHead>
+                      <TableHead className="font-semibold text-gray-900">Proveedor</TableHead>
+                      <TableHead className="font-semibold text-gray-900">Método de Pago</TableHead>
+                      <TableHead className="font-semibold text-gray-900">Monto Total</TableHead>
+                      <TableHead className="font-semibold text-gray-900 text-center">Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {purchases.map((purchase) => (
+                      <TableRow key={purchase.id} className="hover:bg-gray-50 transition-colors">
+                        <TableCell>
                           <div className="flex items-center gap-2">
-                            <span className="font-semibold text-gray-900">Compra #{purchase.id}</span>
-                            {purchase.invoiceNumber && (
-                              <Badge variant="outline" className="text-xs">
-                                {purchase.invoiceNumber}
-                              </Badge>
-                            )}
+                            <Calendar className="h-4 w-4 text-gray-500" />
+                            {format(new Date(purchase.purchaseDate), 'dd MMM yyyy', { locale: es })}
                           </div>
-                          <p className="text-sm text-gray-600 flex items-center gap-1">
-                            <Building className="h-3 w-3" />
-                            {purchase.supplier}
-                          </p>
-                        </div>
-
-                        <div className="space-y-1">
-                          <p className="text-sm font-medium text-gray-900">
-                            {format(new Date(purchase.purchaseDate), "PPP", { locale: es })}
-                          </p>
-                          <p className="text-xs text-gray-600">
-                            {format(new Date(purchase.purchaseDate), "HH:mm")}
-                          </p>
-                        </div>
-
-                        <div className="space-y-1">
-                          <p className="text-sm font-medium text-gray-900 flex items-center gap-1">
-                            <CreditCard className="h-3 w-3" />
-                            {getPaymentMethodText(purchase.paymentMethod)}
-                          </p>
-                          <p className="text-xs text-gray-600">Método de pago</p>
-                        </div>
-
-                        <div className="space-y-1">
-                          <p className="text-lg font-bold text-orange-600">
-                            ${Number(purchase.totalAmount).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </p>
-                          <p className="text-xs text-gray-600">Total</p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Building className="h-4 w-4 text-gray-500" />
+                            <span className="font-medium">{purchase.supplier}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <CreditCard className="h-4 w-4 text-gray-500" />
+                            <Badge variant="outline" className="text-xs">
+                              {getPaymentMethodText(purchase.paymentMethod)}
+                            </Badge>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <DollarSign className="h-4 w-4 text-green-600" />
+                            <span className="font-semibold text-green-700">
+                              ${Number(purchase.totalAmount).toFixed(2)}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center justify-center gap-2">
+                            <Button
+                              onClick={() => handleViewInvoice(purchase)}
+                              size="sm"
+                              variant="outline"
+                              className="h-8 px-3 hover:bg-orange-50 hover:border-orange-300 hover:text-orange-700 transition-colors"
+                            >
+                              <Eye className="h-4 w-4 mr-1" />
+                              Ver
+                            </Button>
+                            <Button
+                              onClick={() => handleViewInvoice(purchase)}
+                              size="sm"
+                              variant="outline"
+                              className="h-8 px-3 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition-colors"
+                            >
+                              <Printer className="h-4 w-4 mr-1" />
+                              Imprimir
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-8 px-3 text-red-600 hover:text-red-700 hover:bg-red-50 hover:border-red-300 transition-colors"
+                                >
+                                  <Trash2 className="h-4 w-4 mr-1" />
+                                  Eliminar
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>¿Eliminar compra?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Esta acción no se puede deshacer. La compra del proveedor "{purchase.supplier}" 
+                                    por ${Number(purchase.totalAmount).toFixed(2)} será eliminada permanentemente.
+                                    <br /><br />
+                                    <strong>Nota:</strong> Los productos agregados al inventario y los activos creados 
+                                    desde esta compra NO serán eliminados automáticamente.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => handleDelete(purchase.id)}
+                                    className="bg-red-600 hover:bg-red-700"
+                                  >
+                                    Eliminar Compra
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </ScrollArea>
             )}
           </CardContent>
         </Card>
       </div>
+
+      {/* Diálogo de factura de compra */}
+      {selectedPurchase && (
+        <PurchaseInvoiceDialog
+          open={invoiceDialogOpen}
+          onOpenChange={setInvoiceDialogOpen}
+          purchase={selectedPurchase}
+          onDelete={handleDelete}
+        />
+      )}
     </div>
   );
 }

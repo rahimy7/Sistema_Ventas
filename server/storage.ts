@@ -86,6 +86,7 @@ export interface IStorage {
   createPurchase(purchase: InsertPurchase): Promise<Purchase>;
   updatePurchase(id: number, purchase: Partial<InsertPurchase>): Promise<Purchase>;
   deletePurchase(id: number): Promise<void>;
+  getPurchaseItems(purchaseId: number): Promise<any[]>;
 
   // Inventory operations
   getInventoryItems(): Promise<InventoryItem[]>;
@@ -129,6 +130,7 @@ export interface IStorage {
   updateSale(id: number, sale: Partial<InsertSale>): Promise<Sale>;
   deleteSale(id: number): Promise<void>;
   getSaleItems(saleId: number): Promise<SaleItem[]>;
+  
 
   // Company settings operations
   getCompanySettings(): Promise<CompanySettings | undefined>;
@@ -548,9 +550,26 @@ async createEnhancedPurchase(purchaseData: {
     return updatedPurchase;
   }
 
-  async deletePurchase(id: number): Promise<void> {
-    await db.delete(purchases).where(eq(purchases.id, id));
-  }
+ async deletePurchase(id: number): Promise<void> {
+  return await db.transaction(async (tx) => {
+    console.log(`Storage: Deleting purchase ${id} and its items`);
+    
+    // First, delete all purchase items associated with this purchase
+    await tx.delete(purchaseItems).where(eq(purchaseItems.purchaseId, id));
+    console.log(`Storage: Deleted purchase items for purchase ${id}`);
+    
+    // Then, delete the purchase itself
+    await tx.delete(purchases).where(eq(purchases.id, id));
+    console.log(`Storage: Deleted purchase ${id}`);
+  });
+}
+async getPurchaseItems(purchaseId: number) {
+  return await db
+    .select()
+    .from(purchaseItems)
+    .where(eq(purchaseItems.purchaseId, purchaseId))
+    .orderBy(purchaseItems.id);
+}
 
   async getPurchaseStats(): Promise<{
     totalPurchases: number;
@@ -886,6 +905,7 @@ async createEnhancedPurchase(purchaseData: {
 
     return `V${year}${month}${String(nextNumber).padStart(4, '0')}`;
   }
+
 
   // Dashboard analytics
   async getDashboardStats(): Promise<{
