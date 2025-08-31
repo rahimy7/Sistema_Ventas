@@ -117,10 +117,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Health check endpoint
-  app.get("/api/health", (req, res) => {
-    res.json({ status: "ok", timestamp: new Date().toISOString() });
-  });
 
   // Dashboard routes with proper error handling - requires authentication
   app.get("/api/dashboard/stats", requireAuth, async (req, res) => {
