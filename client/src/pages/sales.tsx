@@ -116,20 +116,20 @@ export default function SalesPage() {
 const handleViewInvoice = async (sale: SaleWithItems) => {
   try {
     console.log("Loading items for sale:", sale.id);
-    
+
     // Cargar items desde la API
-    const items = await apiRequest("GET", `/api/sales/${sale.id}/items`);
+    const res = await apiRequest("GET", `/api/sales/${sale.id}/items`);
+    const items: SaleItem[] = await res.json();
     console.log("Loaded items from API:", items);
-    
+
     // Crear objeto de venta con items
     const saleWithItems: SaleWithItems = {
       ...sale,
-      items: items
+      items,
     };
-    
+
     setSaleForInvoice(saleWithItems);
     setInvoiceDialogOpen(true);
-    
   } catch (error) {
     console.error("Error loading sale items:", error);
     toast({
