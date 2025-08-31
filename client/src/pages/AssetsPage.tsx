@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -275,6 +275,9 @@ export default function AssetsPage() {
                     <DialogTitle className="text-xl font-semibold">
                       {editingAsset ? "Editar Activo" : "Registrar Nuevo Activo"}
                     </DialogTitle>
+                    <DialogDescription>
+                      Complete la información del activo fijo
+                    </DialogDescription>
                   </DialogHeader>
                   <AssetForm
                     asset={editingAsset}
@@ -997,6 +1000,9 @@ export default function AssetsPage() {
                 <Settings className="h-5 w-5 text-purple-600" />
                 Detalles del Activo
               </DialogTitle>
+              <DialogDescription>
+                Información completa del activo seleccionado
+              </DialogDescription>
             </DialogHeader>
             {selectedAsset && (
               <div className="space-y-6">

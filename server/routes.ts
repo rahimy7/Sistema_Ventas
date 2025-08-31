@@ -698,7 +698,9 @@ app.post("/api/purchases/enhanced", requireAuth, requireRole(['admin']), async (
       res.json({ saleNumber });
     } catch (error) {
       console.error("Error generating sale number:", error);
-      res.status(500).json({ message: "Failed to generate sale number" });
+      const message =
+        error instanceof Error ? error.message : "Failed to generate sale number";
+      res.status(500).json({ message });
     }
   });
 
@@ -726,7 +728,8 @@ app.post("/api/purchases/enhanced", requireAuth, requireRole(['admin']), async (
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid data", errors: error.errors });
       }
-      res.status(500).json({ message: "Failed to create sale" });
+      const message = error instanceof Error ? error.message : "Failed to create sale";
+      res.status(500).json({ message });
     }
   });
 

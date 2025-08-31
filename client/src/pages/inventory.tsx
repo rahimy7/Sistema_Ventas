@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -114,6 +114,9 @@ export default function InventoryPage() {
                 <DialogContent className="max-w-2xl">
                   <DialogHeader>
                     <DialogTitle className="text-xl font-semibold">Agregar Nuevo Producto</DialogTitle>
+                    <DialogDescription>
+                      Ingrese la información del producto a añadir al inventario
+                    </DialogDescription>
                   </DialogHeader>
                   <InventoryForm onSuccess={() => setIsAddDialogOpen(false)} />
                 </DialogContent>

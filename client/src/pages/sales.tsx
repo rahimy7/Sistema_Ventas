@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -169,6 +169,9 @@ const handleViewInvoice = async (sale: SaleWithItems) => {
               <DialogContent className="max-w-7xl max-h-screen w-[95vw] h-[95vh] overflow-hidden">
                 <DialogHeader>
                   <DialogTitle className="text-xl">Registrar Nueva Venta</DialogTitle>
+                  <DialogDescription>
+                    Complete los datos para agregar una nueva venta
+                  </DialogDescription>
                 </DialogHeader>
                 <div className="flex-1 overflow-y-auto">
                   <SaleFormEnhanced 

@@ -1,4 +1,4 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -44,6 +44,9 @@ export default function SupplierDetailsDialog({
             <Building className="h-5 w-5 text-orange-600" />
             Detalles del Proveedor
           </DialogTitle>
+          <DialogDescription>
+            Información completa del proveedor seleccionado
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6">

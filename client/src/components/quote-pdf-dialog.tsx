@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { downloadQuotePDF, validateQuoteForPDF, type QuoteForPDF, type CompanyInfo } from "@/lib/quote-pdf-utils";
@@ -166,6 +166,9 @@ export default function QuotePDFDialog({ quote, children }: QuotePDFDialogProps)
             <Printer className="h-5 w-5 text-blue-600" />
             Generar PDF - {quote.quoteNumber}
           </DialogTitle>
+          <DialogDescription>
+            Previsualiza y genera un PDF de la cotización
+          </DialogDescription>
         </DialogHeader>
         
         <div className="space-y-6">

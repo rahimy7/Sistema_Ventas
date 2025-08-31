@@ -4,6 +4,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -188,6 +189,9 @@ export default function PurchaseInvoiceDialog({
             <FileText className="h-5 w-5" />
             Detalles de Compra - COMP-{String(purchase.id).padStart(6, '0')}
           </DialogTitle>
+          <DialogDescription>
+            Información detallada de la compra seleccionada
+          </DialogDescription>
         </DialogHeader>
 
         <ScrollArea className="max-h-[70vh]">

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
@@ -197,6 +197,9 @@ useEffect(() => {
                     <DialogTitle className="text-xl font-semibold">
                       {editingSupplier ? "Editar Proveedor" : "Registrar Nuevo Proveedor"}
                     </DialogTitle>
+                    <DialogDescription>
+                      Ingrese la información del proveedor
+                    </DialogDescription>
                   </DialogHeader>
                   <SupplierForm
                     supplier={editingSupplier}

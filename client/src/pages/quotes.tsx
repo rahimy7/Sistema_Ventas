@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -248,8 +248,11 @@ export default function QuotesPage() {
               <DialogContent className="max-w-4xl">
                 <DialogHeader>
                   <DialogTitle>Nueva Cotización</DialogTitle>
+                  <DialogDescription>
+                    Ingrese los detalles para crear una nueva cotización
+                  </DialogDescription>
                 </DialogHeader>
-                <QuoteForm 
+                <QuoteForm
                   onSuccess={() => setDialogOpen(false)}
                   onCancel={() => setDialogOpen(false)}
                 />
