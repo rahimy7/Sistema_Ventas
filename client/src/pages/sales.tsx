@@ -168,29 +168,50 @@ export default function SalesPage() {
   };
 
   // 5. Función para crear venta a crédito
-  const createCreditSale = async (saleData: any) => {
-    try {
-      const response = await apiRequest("POST", "/api/sales/credit", saleData);
-      const result = await response.json();
-      
-      toast({
-        title: "Venta a crédito creada",
-        description: `Factura ${result.invoiceNumber} generada exitosamente`,
-      });
-      
-      queryClient.invalidateQueries({ queryKey: ["/api/sales"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/accounts-receivable"] });
-      
-      return result;
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "No se pudo crear la venta a crédito",
-        variant: "destructive",
-      });
-      throw error;
-    }
-  };
+const createCreditSale = async (saleData: any) => {
+  try {
+    // Primero crear la venta regular
+    const saleResponse = await apiRequest("POST", "/api/sales", {
+      ...saleData,
+      paymentMethod: "credit"
+    });
+    
+    const sale = await saleResponse.json();
+    
+    // Luego crear la factura a crédito
+    const invoiceData = {
+      saleId: sale.id,
+      customerId: saleData.customerId,
+      customerName: saleData.customerName,
+      total: saleData.total,
+      items: saleData.items,
+      creditTerms: saleData.creditTerms,
+      invoiceNumber: `INV-${Date.now()}`,
+      dueDate: new Date(Date.now() + (saleData.creditTerms.daysToPayment * 24 * 60 * 60 * 1000))
+    };
+    
+    const invoiceResponse = await apiRequest("POST", "/api/sales/credit", invoiceData);
+    const invoice = await invoiceResponse.json();
+    
+    toast({
+      title: "Venta a crédito creada",
+      description: `Factura ${invoice.invoiceNumber} generada exitosamente`,
+    });
+    
+    // Invalidar ambas queries
+    queryClient.invalidateQueries({ queryKey: ["/api/sales"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/accounts-receivable"] });
+    
+    return { sale, invoice };
+  } catch (error: any) {
+    toast({
+      title: "Error",
+      description: error.message || "No se pudo crear la venta a crédito",
+      variant: "destructive",
+    });
+    throw error;
+  }
+};
 
   const handleDelete = (id: number) => {
     deleteSale.mutate(id);

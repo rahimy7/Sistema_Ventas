@@ -1896,6 +1896,67 @@ async getCustomerCreditTerms(customerId: string): Promise<CustomerCreditTerms | 
   return { ...terms, currentBalance: balance };
 }
 
+async createCreditSale(saleData: any): Promise<{ sale: any; invoice: Invoice }> {
+  return await db.transaction(async (tx) => {
+    // 1. Crear la venta
+    const [sale] = await tx
+      .insert(sales)
+      .values({
+        customerId: saleData.customerId,
+        customerName: saleData.customerName,
+        total: saleData.total,
+        paymentMethod: "credit",
+        saleDate: new Date(),
+        createdBy: saleData.createdBy
+      })
+      .returning();
+
+    // 2. Crear items de venta
+    if (saleData.items && saleData.items.length > 0) {
+      await tx.insert(saleItems).values(
+        saleData.items.map((item: any) => ({
+          saleId: sale.id,
+          inventoryId: item.inventoryId || item.productId, // Usar inventoryId según el esquema
+          productName: item.productName,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          subtotal: item.totalPrice || (Number(item.quantity) * Number(item.unitPrice)).toString()
+        }))
+      );
+    }
+
+    // 3. Crear la factura a crédito
+    const dueDate = new Date();
+    dueDate.setDate(dueDate.getDate() + saleData.creditTerms.daysToPayment);
+
+    const [invoice] = await tx
+      .insert(invoices)
+      .values({
+        invoiceNumber: `INV-${Date.now()}`,
+        customerId: saleData.customerId || sale.id.toString(), // Usar saleId como referencia
+        customerName: saleData.customerName,
+        customerEmail: saleData.customerEmail,
+        customerPhone: saleData.customerPhone,
+        customerAddress: saleData.customerAddress,
+        issueDate: new Date(),
+        dueDate: dueDate,
+        subtotal: saleData.subtotal,
+        taxRate: saleData.taxRate || "0",
+        taxAmount: saleData.taxAmount || "0",
+        discountAmount: saleData.discountAmount || "0",
+        total: saleData.total,
+        saleType: 'credit',
+        paymentStatus: 'pending',
+        balanceDue: saleData.total,
+        paidAmount: "0",
+        creditTerms: saleData.creditTerms.daysToPayment
+      })
+      .returning();
+
+    return { sale, invoice };
+  });
+}
+
 async createCustomerCreditTerms(data: InsertCustomerCreditTerms): Promise<CustomerCreditTerms> {
   const [terms] = await db
     .insert(customerCreditTerms)

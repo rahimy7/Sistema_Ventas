@@ -1379,6 +1379,19 @@ app.post("/mark-overdue", async (req, res) => {
   }
 });
 
+app.get("/api/accounts-receivable", requireAuth, async (req, res) => {
+  try {
+    const accountsReceivable = await storage.getAccountsReceivable();
+    res.json(accountsReceivable);
+  } catch (error) {
+    console.error("Error fetching accounts receivable:", error);
+    res.status(500).json({
+      message: "Error al obtener cuentas por cobrar",
+      error: error instanceof Error ? error.message : "Error desconocido"
+    });
+  }
+});
+
 app.get("/api/accounts-receivable/overdue", requireAuth, async (req, res) => {
   try {
     const overdue = await storage.getOverdueInvoices();
