@@ -57,10 +57,14 @@ import {
   Quote,
   QuoteItem,
   quoteItems,
-  QuoteStatus
+  QuoteStatus,
+  InsertInvoicePayment,
+  InvoicePayment,
+  invoicePayments,
+  InvoiceWithPayments
 } from "../shared/schema.js";
 import { db } from "./db.js";
-import { eq, desc, sum, count, gte, lte, and, like, inArray } from "drizzle-orm";
+import { eq, desc, sum, count, gte, lte, and, like, inArray, gt, lt } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 
 export interface IStorage {
@@ -1417,6 +1421,244 @@ async toggleSupplierStatus(id: number): Promise<Supplier> {
         inArray(quotes.status, ["draft", "sent"])
       ));
   }
+
+async getAccountsReceivable(): Promise<InvoiceWithPayments[]> {
+  const allInvoices = await db.select().from(invoices).orderBy(desc(invoices.issueDate));
+  
+  const invoicesWithPayments: InvoiceWithPayments[] = [];
+  
+  for (const invoice of allInvoices) {
+    const payments = await db
+      .select()
+      .from(invoicePayments)
+      .where(eq(invoicePayments.invoiceId, invoice.id));
+
+    const items = await db
+      .select()
+      .from(invoiceItems)
+      .where(eq(invoiceItems.invoiceId, invoice.id));
+
+    invoicesWithPayments.push({ ...invoice, payments, items });
+  }
+
+  return invoicesWithPayments;
 }
+
+// Obtener facturas pendientes de pago
+async getPendingInvoices(): Promise<Invoice[]> {
+  return await db
+    .select()
+    .from(invoices)
+    .where(
+      and(
+        inArray(invoices.paymentStatus, ['pending', 'partial', 'overdue']),
+        gt(invoices.balanceDue, "0")
+      )
+    )
+    .orderBy(invoices.dueDate);
+}
+
+// Obtener facturas vencidas
+async getOverdueInvoices(): Promise<Invoice[]> {
+  return await db
+    .select()
+    .from(invoices)
+    .where(
+      and(
+        eq(invoices.paymentStatus, 'overdue'),
+        gt(invoices.balanceDue, "0")
+      )
+    )
+    .orderBy(invoices.dueDate);
+}
+
+// Obtener una factura con sus pagos
+async getInvoiceWithPayments(invoiceId: number): Promise<InvoiceWithPayments | null> {
+  const invoice = await this.getInvoiceById(invoiceId);
+  if (!invoice) return null;
+
+  const payments = await db
+    .select()
+    .from(invoicePayments)
+    .where(eq(invoicePayments.invoiceId, invoiceId))
+    .orderBy(desc(invoicePayments.paymentDate));
+
+  const items = await db
+    .select()
+    .from(invoiceItems)
+    .where(eq(invoiceItems.invoiceId, invoiceId));
+
+  return { ...invoice, payments, items };
+}
+
+// Registrar pago de factura
+async createInvoicePayment(paymentData: InsertInvoicePayment): Promise<InvoicePayment> {
+  return await db.transaction(async (tx) => {
+    // Validar que la factura existe
+    const [invoice] = await tx
+      .select()
+      .from(invoices)
+      .where(eq(invoices.id, paymentData.invoiceId));
+
+    if (!invoice) {
+      throw new Error("Factura no encontrada");
+    }
+
+    // Validar que el monto no exceda el saldo pendiente
+    const currentBalance = Number(invoice.balanceDue || 0);
+    const paymentAmount = Number(paymentData.paymentAmount);
+
+    if (paymentAmount > currentBalance) {
+      throw new Error(`El monto del pago ($${paymentAmount}) no puede ser mayor al saldo pendiente ($${currentBalance})`);
+    }
+
+    // Crear el pago
+    const [payment] = await tx
+      .insert(invoicePayments)
+      .values(paymentData)
+      .returning();
+
+    return payment;
+  });
+}
+
+// Obtener historial de pagos de una factura
+async getInvoicePayments(invoiceId: number): Promise<InvoicePayment[]> {
+  return await db
+    .select()
+    .from(invoicePayments)
+    .where(eq(invoicePayments.invoiceId, invoiceId))
+    .orderBy(desc(invoicePayments.paymentDate));
+}
+
+// Eliminar pago
+async deleteInvoicePayment(paymentId: number): Promise<void> {
+  await db.delete(invoicePayments).where(eq(invoicePayments.id, paymentId));
+}
+
+// Estadísticas de cuentas por cobrar
+async getAccountsReceivableStats(): Promise<{
+  totalPending: number;
+  totalOverdue: number;
+  totalPaid: number;
+  averageDaysToPayment: number;
+  pendingInvoicesCount: number;
+  overdueInvoicesCount: number;
+}> {
+  // Total pendiente
+  const [pendingResult] = await db
+    .select({
+      total: sum(invoices.balanceDue),
+      count: count()
+    })
+    .from(invoices)
+    .where(
+      and(
+        inArray(invoices.paymentStatus, ['pending', 'partial']),
+        gt(invoices.balanceDue, "0")
+      )
+    );
+
+  // Total vencido
+  const [overdueResult] = await db
+    .select({
+      total: sum(invoices.balanceDue),
+      count: count()
+    })
+    .from(invoices)
+    .where(
+      and(
+        eq(invoices.paymentStatus, 'overdue'),
+        gt(invoices.balanceDue, "0")
+      )
+    );
+
+  // Total pagado este mes
+  const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  const [paidResult] = await db
+    .select({
+      total: sum(invoicePayments.paymentAmount)
+    })
+    .from(invoicePayments)
+    .where(gte(invoicePayments.paymentDate, startOfMonth));
+
+  return {
+    totalPending: Number(pendingResult.total || 0),
+    totalOverdue: Number(overdueResult.total || 0),
+    totalPaid: Number(paidResult.total || 0),
+    averageDaysToPayment: 0, // Calcular después
+    pendingInvoicesCount: pendingResult.count,
+    overdueInvoicesCount: overdueResult.count,
+  };
+}
+
+// Reporte de antigüedad de saldos
+async getAgingReport(): Promise<{
+  current: number;        // 0-30 días
+  days30to60: number;     // 31-60 días
+  days61to90: number;     // 61-90 días
+  over90days: number;     // Más de 90 días
+}> {
+  const today = new Date();
+  const days30 = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+  const days60 = new Date(today.getTime() - 60 * 24 * 60 * 60 * 1000);
+  const days90 = new Date(today.getTime() - 90 * 24 * 60 * 60 * 1000);
+
+  const pendingInvoices = await db
+    .select()
+    .from(invoices)
+    .where(
+      and(
+        inArray(invoices.paymentStatus, ['pending', 'partial', 'overdue']),
+        gt(invoices.balanceDue, "0")
+      )
+    );
+
+  const aging = {
+    current: 0,
+    days30to60: 0,
+    days61to90: 0,
+    over90days: 0
+  };
+
+  pendingInvoices.forEach(invoice => {
+    const dueDate = new Date(invoice.dueDate!);
+    const balance = Number(invoice.balanceDue);
+
+    if (dueDate >= days30) {
+      aging.current += balance;
+    } else if (dueDate >= days60) {
+      aging.days30to60 += balance;
+    } else if (dueDate >= days90) {
+      aging.days61to90 += balance;
+    } else {
+      aging.over90days += balance;
+    }
+  });
+
+  return aging;
+}
+
+// Marcar facturas vencidas (ejecutar diariamente)
+async markOverdueInvoices(): Promise<number> {
+  const today = new Date();
+  
+  const result = await db
+    .update(invoices)
+    .set({ paymentStatus: 'overdue' })
+    .where(
+      and(
+        lt(invoices.dueDate, today),
+        inArray(invoices.paymentStatus, ['pending', 'partial']),
+        gt(invoices.balanceDue, "0")
+      )
+    )
+    .returning({ id: invoices.id });
+
+  return result.length;
+}
+}
+
+
 
 export const storage = new DatabaseStorage();

@@ -15,6 +15,13 @@ export const assetStatusEnum = pgEnum('asset_status', ['active', 'depreciated', 
 // Supplier status enum - Nuevo
 export const supplierStatusEnum = pgEnum('supplier_status', ['active', 'inactive', 'suspended']);
 
+export const paymentStatusEnum = pgEnum('payment_status', [
+  'pending',    // Pendiente
+  'partial',    // Parcialmente pagado
+  'paid',       // Pagado completamente
+  'overdue'     // Vencido
+]);
+
 // Users table for authentication
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
@@ -169,6 +176,11 @@ export const invoices = pgTable("invoices", {
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+   creditTerms: integer("credit_terms").default(30), // Días de crédito
+  paymentStatus: paymentStatusEnum("payment_status").notNull().default("pending"),
+  balanceDue: decimal("balance_due", { precision: 10, scale: 2 }).notNull(),
+  paidAmount: decimal("paid_amount", { precision: 10, scale: 2 }).default("0"),
+  lastPaymentDate: timestamp("last_payment_date"),
 });
 
 // Invoice Items
@@ -350,6 +362,7 @@ export const purchaseItemsRelations = relations(purchaseItems, ({ one }) => ({
     references: [assets.id],
   }),
 }));
+
 
 
 export const insertIncomeSchema = createInsertSchema(incomes).omit({
@@ -690,6 +703,41 @@ export const insertQuoteItemSchema = createInsertSchema(quoteItems).omit({
   createdAt: true,
 });
 
+
+
+// Tabla de pagos de facturas
+export const invoicePayments = pgTable("invoice_payments", {
+  id: serial("id").primaryKey(),
+  invoiceId: integer("invoice_id").references(() => invoices.id, { onDelete: "cascade" }).notNull(),
+  paymentAmount: decimal("payment_amount", { precision: 10, scale: 2 }).notNull(),
+  paymentDate: timestamp("payment_date").notNull(),
+  paymentMethod: varchar("payment_method", { length: 50 }).notNull(),
+  referenceNumber: varchar("reference_number", { length: 100 }),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  createdBy: text("created_by").notNull(),
+});
+
+export const invoicePaymentsRelations = relations(invoicePayments, ({ one }) => ({
+  invoice: one(invoices, {
+    fields: [invoicePayments.invoiceId],
+    references: [invoices.id],
+  }),
+}));
+
+export const invoicesRelationsUpdated = relations(invoices, ({ many }) => ({
+  items: many(invoiceItems),
+  payments: many(invoicePayments), // Nueva relación
+}));
+
+
+export type InvoicePayment = typeof invoicePayments.$inferSelect;
+export type InsertInvoicePayment = typeof invoicePayments.$inferInsert;
+
+export type InvoiceWithPayments = Invoice & {
+  items: InvoiceItem[];
+  payments: InvoicePayment[];
+};
 // AGREGAR ESTOS TIPOS AL FINAL DEL ARCHIVO, DESPUÉS DE LOS EXISTENTES
 export type Quote = typeof quotes.$inferSelect;
 export type InsertQuote = z.infer<typeof insertQuoteSchema>;
@@ -701,4 +749,20 @@ export type InsertQuoteItem = z.infer<typeof insertQuoteItemSchema>;
 export type QuoteWithItems = Quote & {
   items: QuoteItem[];
 };
+
+export const insertInvoicePaymentSchema = createInsertSchema(invoicePayments).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const createPaymentSchema = z.object({
+  invoiceId: z.number(),
+  paymentAmount: z.number().positive(),
+  paymentDate: z.date(),
+  paymentMethod: z.enum(["cash", "card", "transfer", "check"]),
+  referenceNumber: z.string().optional(),
+  notes: z.string().optional(),
+});
+
+export type CreatePaymentData = z.infer<typeof createPaymentSchema>;
 

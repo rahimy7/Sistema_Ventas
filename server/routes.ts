@@ -4,7 +4,7 @@ import { storage } from "./storage.js";
 import session from "express-session";
 import ConnectPgSimple from "connect-pg-simple";
 import { db, pool } from "./db.js";
-import { loginSchema, type User, type LoginCredentials, insertUserSchema, insertAssetSchema, insertSupplierSchema, sales } from "../shared/schema.js";
+import { loginSchema, type User, type LoginCredentials, insertUserSchema, insertAssetSchema, insertSupplierSchema, sales, createPaymentSchema } from "../shared/schema.js";
 import {
   insertIncomeSchema,
   insertExpenseSchema,
@@ -1190,6 +1190,189 @@ app.get("/api/sales", requireAuth, async (req, res) => {
   }
 });
 
+// GET /api/accounts-receivable - Obtener todas las cuentas por cobrar
+app.get("/", async (req, res) => {
+  try {
+    const accountsReceivable = await storage.getAccountsReceivable();
+    res.json(accountsReceivable);
+  } catch (error) {
+    console.error("Error fetching accounts receivable:", error);
+    res.status(500).json({
+      message: "Error al obtener cuentas por cobrar",
+      error: error instanceof Error ? error.message : "Error desconocido"
+    });
+  }
+});
+
+// GET /api/accounts-receivable/pending - Facturas pendientes
+app.get("/pending", async (req, res) => {
+  try {
+    const pending = await storage.getPendingInvoices();
+    res.json(pending);
+  } catch (error) {
+    console.error("Error fetching pending invoices:", error);
+    res.status(500).json({
+      message: "Error al obtener facturas pendientes",
+      error: error instanceof Error ? error.message : "Error desconocido"
+    });
+  }
+});
+
+// GET /api/accounts-receivable/overdue - Facturas vencidas
+app.get("/overdue", async (req, res) => {
+  try {
+    const overdue = await storage.getOverdueInvoices();
+    res.json(overdue);
+  } catch (error) {
+    console.error("Error fetching overdue invoices:", error);
+    res.status(500).json({
+      message: "Error al obtener facturas vencidas",
+      error: error instanceof Error ? error.message : "Error desconocido"
+    });
+  }
+});
+
+// GET /api/accounts-receivable/stats - Estadísticas
+app.get("/stats", async (req, res) => {
+  try {
+    const stats = await storage.getAccountsReceivableStats();
+    res.json(stats);
+  } catch (error) {
+    console.error("Error fetching AR stats:", error);
+    res.status(500).json({
+      message: "Error al obtener estadísticas",
+      error: error instanceof Error ? error.message : "Error desconocido"
+    });
+  }
+});
+
+// GET /api/accounts-receivable/aging - Reporte de antigüedad
+app.get("/aging", async (req, res) => {
+  try {
+    const aging = await storage.getAgingReport();
+    res.json(aging);
+  } catch (error) {
+    console.error("Error fetching aging report:", error);
+    res.status(500).json({
+      message: "Error al obtener reporte de antigüedad",
+      error: error instanceof Error ? error.message : "Error desconocido"
+    });
+  }
+});
+
+// GET /api/accounts-receivable/invoice/:id - Factura con pagos
+app.get("/invoice/:id", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) {
+      return res.status(400).json({ message: "ID de factura inválido" });
+    }
+
+    const invoice = await storage.getInvoiceWithPayments(id);
+    if (!invoice) {
+      return res.status(404).json({ message: "Factura no encontrada" });
+    }
+
+    res.json(invoice);
+  } catch (error) {
+    console.error("Error fetching invoice with payments:", error);
+    res.status(500).json({
+      message: "Error al obtener factura",
+      error: error instanceof Error ? error.message : "Error desconocido"
+    });
+  }
+});
+
+// POST /api/accounts-receivable/payment - Registrar pago
+app.post("/payment", async (req, res) => {
+  try {
+    const validatedData = createPaymentSchema.parse(req.body);
+    
+    const paymentData = {
+      invoiceId: validatedData.invoiceId,
+      paymentAmount: validatedData.paymentAmount.toString(),
+      paymentDate: validatedData.paymentDate,
+      paymentMethod: validatedData.paymentMethod,
+      referenceNumber: validatedData.referenceNumber || null,
+      notes: validatedData.notes || null,
+      createdBy: (req as any).user?.username || "system" // <- Casting
+    };
+
+    const payment = await storage.createInvoicePayment(paymentData);
+    res.status(201).json(payment);
+  } catch (error) {
+    console.error("Error creating payment:", error);
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        message: "Datos de pago inválidos",
+        errors: error.errors
+      });
+    }
+    res.status(500).json({
+      message: "Error al registrar pago",
+      error: error instanceof Error ? error.message : "Error desconocido"
+    });
+  }
+});
+
+// GET /api/accounts-receivable/invoice/:id/payments - Historial de pagos
+app.get("/invoice/:id/payments", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) {
+      return res.status(400).json({ message: "ID de factura inválido" });
+    }
+
+    const payments = await storage.getInvoicePayments(id);
+    res.json(payments);
+  } catch (error) {
+    console.error("Error fetching payments:", error);
+    res.status(500).json({
+      message: "Error al obtener historial de pagos",
+      error: error instanceof Error ? error.message : "Error desconocido"
+    });
+  }
+});
+
+// DELETE /api/accounts-receivable/payment/:id - Eliminar pago
+app.delete("/payment/:id", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) {
+      return res.status(400).json({ message: "ID de pago inválido" });
+    }
+
+    await storage.deleteInvoicePayment(id);
+    res.status(204).send();
+  } catch (error) {
+    console.error("Error deleting payment:", error);
+    res.status(500).json({
+      message: "Error al eliminar pago",
+      error: error instanceof Error ? error.message : "Error desconocido"
+    });
+  }
+});
+
+// POST /api/accounts-receivable/mark-overdue - Marcar facturas vencidas
+app.post("/mark-overdue", async (req, res) => {
+  try {
+    const updatedCount = await storage.markOverdueInvoices();
+    res.json({ 
+      message: `${updatedCount} facturas marcadas como vencidas`,
+      updatedCount 
+    });
+  } catch (error) {
+    console.error("Error marking overdue invoices:", error);
+    res.status(500).json({
+      message: "Error al marcar facturas vencidas",
+      error: error instanceof Error ? error.message : "Error desconocido"
+    });
+  }
+});
+
+
+
+
 app.get("/api/sales/history", requireAuth, async (req, res) => {
   try {
     const page = parseInt(req.query.page as string) || 1;
@@ -1226,4 +1409,5 @@ app.get("/api/sales/history", requireAuth, async (req, res) => {
   const httpServer = createServer(app);
   return httpServer;
 }
+
 

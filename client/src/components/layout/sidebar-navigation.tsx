@@ -17,7 +17,8 @@ import {
   LogOut,
   Home,
   TrendingUp,
-  Building
+  Building,
+  DollarSign
 } from "lucide-react";
 
 interface NavigationItem {
@@ -48,6 +49,13 @@ const navigationItems: NavigationItem[] = [
     icon: ShoppingCart,
     requiresRole: ["admin", "sales"],
     description: "Registro y seguimiento de ventas"
+  },
+  {
+    title: "Cuentas por Cobrar",
+    href: "/cuentas-por-cobrar",
+    icon: DollarSign,
+    requiresRole: ["admin", "sales"],
+    description: "Gestión de pagos y cobros pendientes"
   },
   {
     title: "Compras",
