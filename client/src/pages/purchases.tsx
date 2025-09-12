@@ -174,7 +174,7 @@ export default function PurchasesPage() {
               <div className="flex items-center justify-between">
                 <div className="space-y-2">
                   <p className="text-purple-700 font-medium">Monto Total</p>
-                  <p className="text-3xl font-bold text-purple-900">${purchaseStats.totalAmount.toFixed(2)}</p>
+                  <p className="text-3xl font-bold text-purple-900">${purchaseStats.totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
                   <p className="text-sm text-purple-600">Suma de compras</p>
                 </div>
                 <div className="h-14 w-14 bg-purple-500 rounded-2xl flex items-center justify-center">
@@ -189,7 +189,7 @@ export default function PurchasesPage() {
               <div className="flex items-center justify-between">
                 <div className="space-y-2">
                   <p className="text-green-700 font-medium">Compra Promedio</p>
-                  <p className="text-3xl font-bold text-green-900">${purchaseStats.averagePurchase.toFixed(2)}</p>
+                  <p className="text-3xl font-bold text-green-900">${purchaseStats.averagePurchase.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
                   <p className="text-sm text-green-600">Por compra</p>
                 </div>
                 <div className="h-14 w-14 bg-green-500 rounded-2xl flex items-center justify-center">
@@ -258,7 +258,7 @@ export default function PurchasesPage() {
                           <div className="flex items-center gap-2">
                             <DollarSign className="h-4 w-4 text-green-600" />
                             <span className="font-semibold text-green-700">
-                              ${Number(purchase.totalAmount).toFixed(2)}
+                              ${Number(purchase.totalAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                             </span>
                           </div>
                         </TableCell>
@@ -298,7 +298,7 @@ export default function PurchasesPage() {
                                   <AlertDialogTitle>¿Eliminar compra?</AlertDialogTitle>
                                   <AlertDialogDescription>
                                     Esta acción no se puede deshacer. La compra del proveedor "{purchase.supplier}" 
-                                    por ${Number(purchase.totalAmount).toFixed(2)} será eliminada permanentemente.
+                                    por ${Number(purchase.totalAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })} será eliminada permanentemente.
                                     <br /><br />
                                     <strong>Nota:</strong> Los productos agregados al inventario y los activos creados 
                                     desde esta compra NO serán eliminados automáticamente.

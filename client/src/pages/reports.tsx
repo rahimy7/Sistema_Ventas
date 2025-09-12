@@ -285,7 +285,7 @@ export default function ReportsPage() {
                   <div>
                     <p className="text-green-700 text-sm font-medium">Ingresos Totales</p>
                     <p className="text-2xl font-bold text-green-900">
-                      ${monthlyStats.totalRevenue.toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+                      ${monthlyStats.totalRevenue.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </p>
                     <p className="text-xs text-green-600 mt-1">
                       {monthlyStats.salesCount} ventas
@@ -304,7 +304,7 @@ export default function ReportsPage() {
                   <div>
                     <p className="text-red-700 text-sm font-medium">Gastos Totales</p>
                     <p className="text-2xl font-bold text-red-900">
-                      ${(monthlyStats.totalExpenses + monthlyStats.totalPurchases).toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+                      ${(monthlyStats.totalExpenses + monthlyStats.totalPurchases).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </p>
                     <p className="text-xs text-red-600 mt-1">
                       Operacionales + Compras
@@ -325,7 +325,7 @@ export default function ReportsPage() {
                       Utilidad Neta
                     </p>
                     <p className={`text-2xl font-bold ${monthlyStats.netProfit >= 0 ? 'text-blue-900' : 'text-orange-900'}`}>
-                      ${monthlyStats.netProfit.toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+                      ${monthlyStats.netProfit.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </p>
                     <p className={`text-xs mt-1 ${monthlyStats.netProfit >= 0 ? 'text-blue-600' : 'text-orange-600'}`}>
                       {monthlyStats.profitMargin >= 0 ? '+' : ''}{monthlyStats.profitMargin.toFixed(1)}% margen
@@ -344,7 +344,7 @@ export default function ReportsPage() {
                   <div>
                     <p className="text-purple-700 text-sm font-medium">Ticket omedio</p>
                     <p className="text-2xl font-bold text-purple-900">
-                      ${monthlyStats.averageTicket.toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+                      ${monthlyStats.averageTicket.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </p>
                     <p className="text-xs text-purple-600 mt-1">
                       Por venta
@@ -454,13 +454,13 @@ export default function ReportsPage() {
                   <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
                     <span className="font-medium">Ventas</span>
                     <span className="text-lg font-bold text-green-600">
-                      ${monthlyData.sales.reduce((sum, sale) => sum + Number(sale.total), 0).toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+                      ${monthlyData.sales.reduce((sum, sale) => sum + Number(sale.total), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </span>
                   </div>
                   <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
                     <span className="font-medium">Otros Ingresos</span>
                     <span className="text-lg font-bold text-blue-600">
-                      ${monthlyData.incomes.reduce((sum, income) => sum + Number(income.total), 0).toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+                      ${monthlyData.incomes.reduce((sum, income) => sum + Number(income.total), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </span>
                   </div>
                 </div>
@@ -499,19 +499,19 @@ export default function ReportsPage() {
                   <div className="flex justify-between items-center p-3 bg-red-50 rounded-lg">
                     <span className="font-medium">Gastos Operacionales</span>
                     <span className="text-lg font-bold text-red-600">
-                      ${monthlyStats.totalExpenses.toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+                      ${monthlyStats.totalExpenses.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </span>
                   </div>
                   <div className="flex justify-between items-center p-3 bg-orange-50 rounded-lg">
                     <span className="font-medium">Compras/Inventario</span>
                     <span className="text-lg font-bold text-orange-600">
-                      ${monthlyStats.totalPurchases.toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+                      ${monthlyStats.totalPurchases.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </span>
                   </div>
                   <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg border-2 border-gray-200">
                     <span className="font-bold">Total Costos</span>
                     <span className="text-xl font-bold text-gray-800">
-                      ${(monthlyStats.totalExpenses + monthlyStats.totalPurchases).toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+                      ${(monthlyStats.totalExpenses + monthlyStats.totalPurchases).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </span>
                   </div>
                 </div>
@@ -545,7 +545,7 @@ export default function ReportsPage() {
                 </div>
                 <div className="text-center p-4 bg-purple-50 rounded-lg">
                   <p className="text-2xl font-bold text-purple-600">
-                    ${(historicalData.reduce((sum, m) => sum + m.revenue, 0) / historicalData.length).toLocaleString('es-ES', { maximumFractionDigits: 0 })}
+                    ${(historicalData.reduce((sum, m) => sum + m.revenue, 0) / historicalData.length).toLocaleString('en-US', { maximumFractionDigits: 0 })}
                   </p>
                   <p className="text-sm text-purple-700">Ingreso promedio</p>
                 </div>
@@ -560,13 +560,13 @@ export default function ReportsPage() {
                     </div>
                     <div className="flex items-center space-x-6 text-sm">
                       <span className="text-green-600">
-                        +${monthData.revenue.toLocaleString('es-ES', { maximumFractionDigits: 0 })}
+                        +${monthData.revenue.toLocaleString('en-US', { maximumFractionDigits: 0 })}
                       </span>
                       <span className="text-red-600">
-                        -${monthData.expenses.toLocaleString('es-ES', { maximumFractionDigits: 0 })}
+                        -${monthData.expenses.toLocaleString('en-US', { maximumFractionDigits: 0 })}
                       </span>
                       <span className={`font-bold ${monthData.profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        {monthData.profit >= 0 ? '+' : ''}${monthData.profit.toLocaleString('es-ES', { maximumFractionDigits: 0 })}
+                        {monthData.profit >= 0 ? '+' : ''}${monthData.profit.toLocaleString('en-US', { maximumFractionDigits: 0 })}
                       </span>
                     </div>
                   </div>

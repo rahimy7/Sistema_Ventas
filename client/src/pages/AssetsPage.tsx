@@ -313,7 +313,7 @@ export default function AssetsPage() {
                 <div className="space-y-2">
                   <p className="text-emerald-700 font-medium">Valor Actual</p>
                   <p className="text-3xl font-bold text-emerald-900">
-                    ${assetStats.totalCurrentValue.toLocaleString('es-ES', { maximumFractionDigits: 0 })}
+                    ${assetStats.totalCurrentValue.toLocaleString()}
                   </p>
                   <p className="text-sm text-emerald-600">Total patrimonio</p>
                 </div>
@@ -330,7 +330,7 @@ export default function AssetsPage() {
                 <div className="space-y-2">
                   <p className="text-amber-700 font-medium">Depreciación Total</p>
                   <p className="text-3xl font-bold text-amber-900">
-                    ${assetStats.totalDepreciation.toLocaleString('es-ES', { maximumFractionDigits: 0 })}
+                    ${assetStats.totalDepreciation.toLocaleString()}
                   </p>
                   <p className="text-sm text-amber-600">Pérdida de valor</p>
                 </div>
@@ -539,12 +539,12 @@ export default function AssetsPage() {
                                     </div>
                                   </TableCell>
                                   <TableCell className="text-right font-medium">
-                                    ${Number(asset.purchasePrice).toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+                                    ${Number(asset.purchasePrice).toLocaleString()}
                                   </TableCell>
                                   <TableCell className="text-right">
                                     <div className="space-y-1">
                                       <p className="font-medium text-slate-900">
-                                        ${depreciation.currentValue.toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+                                        ${depreciation.currentValue.toLocaleString()}
                                       </p>
                                     </div>
                                   </TableCell>
@@ -554,7 +554,7 @@ export default function AssetsPage() {
                                         -{depreciation.depreciationPercent.toFixed(1)}%
                                       </p>
                                       <p className="text-xs text-slate-500">
-                                        ${depreciation.totalDepreciation.toLocaleString('es-ES', { maximumFractionDigits: 0 })}
+                                        ${depreciation.totalDepreciation.toLocaleString()}
                                       </p>
                                     </div>
                                   </TableCell>
@@ -738,15 +738,15 @@ export default function AssetsPage() {
                                 <div className="grid grid-cols-3 gap-2 text-sm mb-2">
                                   <div>
                                     <p className="text-gray-600">Original:</p>
-                                    <p className="font-medium">${stat.totalOriginal.toLocaleString('es-ES', { maximumFractionDigits: 0 })}</p>
+                                    <p className="font-medium">${stat.totalOriginal.toLocaleString()}</p>
                                   </div>
                                   <div>
                                     <p className="text-gray-600">Actual:</p>
-                                    <p className="font-medium">${stat.totalCurrent.toLocaleString('es-ES', { maximumFractionDigits: 0 })}</p>
+                                    <p className="font-medium">${stat.totalCurrent.toLocaleString()}</p>
                                   </div>
                                   <div>
                                     <p className="text-gray-600">Pérdida:</p>
-                                    <p className="font-medium text-red-600">${stat.depreciation.toLocaleString('es-ES', { maximumFractionDigits: 0 })}</p>
+                                    <p className="font-medium text-red-600">${stat.depreciation.toLocaleString()}</p>
                                   </div>
                                 </div>
                                 <div className="w-full bg-gray-200 rounded-full h-2">

@@ -218,7 +218,7 @@ export default function SalesPage() {
               <div className="flex items-center justify-between">
                 <div className="space-y-2">
                   <p className="text-purple-700 font-medium">Ingresos Totales</p>
-                  <p className="text-3xl font-bold text-purple-900">${salesStats.totalRevenue.toFixed(2)}</p>
+                  <p className="text-3xl font-bold text-purple-900">${salesStats.totalRevenue.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
                   <p className="text-sm text-purple-600">Suma de ventas</p>
                 </div>
                 <div className="h-14 w-14 bg-purple-500 rounded-2xl flex items-center justify-center">
@@ -233,7 +233,7 @@ export default function SalesPage() {
               <div className="flex items-center justify-between">
                 <div className="space-y-2">
                   <p className="text-orange-700 font-medium">Ticket Promedio</p>
-                  <p className="text-3xl font-bold text-orange-900">${salesStats.averageTicket.toFixed(2)}</p>
+                  <p className="text-3xl font-bold text-orange-900">${salesStats.averageTicket.toLocaleString()}</p>
                   <p className="text-sm text-orange-600">Por venta</p>
                 </div>
                 <div className="h-14 w-14 bg-orange-500 rounded-2xl flex items-center justify-center">
@@ -317,7 +317,7 @@ export default function SalesPage() {
                           <div className="flex items-center gap-2">
                             <DollarSign className="h-4 w-4 text-green-600" />
                             <span className="font-semibold text-green-700">
-                              ${Number(sale.total).toFixed(2)}
+                              ${Number(sale.total).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                             </span>
                           </div>
                         </TableCell>
@@ -357,7 +357,7 @@ export default function SalesPage() {
                                   <AlertDialogTitle>¿Eliminar venta?</AlertDialogTitle>
                                   <AlertDialogDescription>
                                     Esta acción no se puede deshacer. La venta del cliente "{sale.customerName || 'Sin nombre'}" 
-                                    por ${Number(sale.total).toFixed(2)} será eliminada permanentemente.
+                                    por ${Number(sale.total).toLocaleString('en-US', { minimumFractionDigits: 2 })} será eliminada permanentemente.
                                     <br /><br />
                                     <strong>Nota:</strong> Los productos vendidos serán devueltos automáticamente al inventario.
                                   </AlertDialogDescription>
