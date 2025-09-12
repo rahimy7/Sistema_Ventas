@@ -22,6 +22,15 @@ import {
 import { z } from "zod";
 import { count, desc } from "drizzle-orm";
 
+// Al inicio de routes.ts
+interface AuthenticatedRequest extends Request {
+  user?: {
+    id: number;
+    username: string;
+    role: string;
+  };
+}
+
 // Extend Express session to include user
 declare module 'express-session' {
   interface SessionData {
@@ -1370,6 +1379,275 @@ app.post("/mark-overdue", async (req, res) => {
   }
 });
 
+app.get("/api/accounts-receivable/overdue", requireAuth, async (req, res) => {
+  try {
+    const overdue = await storage.getOverdueInvoices();
+    res.json(overdue);
+  } catch (error) {
+    console.error("Error fetching overdue invoices:", error);
+    res.status(500).json({
+      message: "Error al obtener facturas vencidas",
+      error: error instanceof Error ? error.message : "Error desconocido"
+    });
+  }
+});
+
+// GET /api/accounts-receivable/stats - Estadísticas
+app.get("/api/accounts-receivable/stats", requireAuth, async (req, res) => {
+  try {
+    const stats = await storage.getAccountsReceivableStats();
+    res.json(stats);
+  } catch (error) {
+    console.error("Error fetching AR stats:", error);
+    res.status(500).json({
+      message: "Error al obtener estadísticas",
+      error: error instanceof Error ? error.message : "Error desconocido"
+    });
+  }
+});
+
+// GET /api/accounts-receivable/aging - Reporte de antigüedad
+app.get("/api/accounts-receivable/aging", requireAuth, async (req, res) => {
+  try {
+    const aging = await storage.getAgingReport();
+    res.json(aging);
+  } catch (error) {
+    console.error("Error fetching aging report:", error);
+    res.status(500).json({
+      message: "Error al obtener reporte de antigüedad",
+      error: error instanceof Error ? error.message : "Error desconocido"
+    });
+  }
+});
+
+// GET /api/invoices/:id/payments - Obtener pagos de una factura
+app.get("/api/invoices/:id/payments", requireAuth, async (req, res) => {
+  try {
+    const invoiceId = parseInt(req.params.id);
+    const payments = await storage.getInvoicePayments(invoiceId);
+    res.json(payments);
+  } catch (error) {
+    console.error("Error fetching invoice payments:", error);
+    res.status(500).json({ message: "Error al obtener pagos de la factura" });
+  }
+});
+
+// POST /api/invoices/:id/payments - Registrar pago
+app.post("/api/invoices/:id/payments", requireAuth, async (req, res) => {
+  try {
+    const authenticatedReq = req as unknown as AuthenticatedRequest;
+    const invoiceId = parseInt(req.params.id);
+    const paymentData = {
+      invoiceId,
+      paymentAmount: req.body.paymentAmount.toString(),
+      paymentDate: new Date(req.body.paymentDate),
+      paymentMethod: req.body.paymentMethod,
+      referenceNumber: req.body.referenceNumber,
+      notes: req.body.notes,
+      createdBy: authenticatedReq.user?.username || 'system'
+    };
+
+    const payment = await storage.createInvoicePayment(paymentData);
+    res.status(201).json(payment);
+  } catch (error) {
+    console.error("Error creating payment:", error);
+    res.status(500).json({ 
+      message: error instanceof Error ? error.message : "Error al registrar pago" 
+    });
+  }
+});
+
+// DELETE /api/payments/:id - Eliminar pago
+app.delete("/api/payments/:id", requireAuth, requireRole(['admin']), async (req, res) => {
+  try {
+    const paymentId = parseInt(req.params.id);
+    await storage.deleteInvoicePayment(paymentId);
+    res.status(204).send();
+  } catch (error) {
+    console.error("Error deleting payment:", error);
+    res.status(500).json({ message: "Error al eliminar pago" });
+  }
+});
+
+// PUT /api/invoices/:id/update-status - Actualizar estado automáticamente
+app.put("/api/invoices/:id/update-status", requireAuth, async (req, res) => {
+  try {
+    const invoiceId = parseInt(req.params.id);
+    await storage.updateInvoicePaymentStatus(invoiceId);
+    res.json({ message: "Estado actualizado correctamente" });
+  } catch (error) {
+    console.error("Error updating invoice status:", error);
+    res.status(500).json({ message: "Error al actualizar estado" });
+  }
+});
+
+// POST /api/accounts-receivable/update-overdue - Actualizar facturas vencidas
+app.post("/api/accounts-receivable/update-overdue", requireAuth, async (req, res) => {
+  try {
+    const updatedCount = await storage.updateOverdueInvoices();
+    res.json({ 
+      message: `${updatedCount} facturas actualizadas como vencidas`,
+      count: updatedCount 
+    });
+  } catch (error) {
+    console.error("Error updating overdue invoices:", error);
+    res.status(500).json({ message: "Error al actualizar facturas vencidas" });
+  }
+});
+
+// Rutas para términos de crédito de clientes
+app.get("/api/customer-credit-terms", requireAuth, async (req, res) => {
+  try {
+    const terms = await storage.getAllCustomerCreditTerms();
+    res.json(terms);
+  } catch (error) {
+    console.error("Error fetching customer credit terms:", error);
+    res.status(500).json({ message: "Error al obtener términos de crédito" });
+  }
+});
+
+app.get("/api/customers/:customerId/credit-terms", requireAuth, async (req, res) => {
+  try {
+    const customerId = req.params.customerId;
+    const terms = await storage.getCustomerCreditTerms(customerId);
+    res.json(terms);
+  } catch (error) {
+    console.error("Error fetching customer credit terms:", error);
+    res.status(500).json({ message: "Error al obtener términos de crédito del cliente" });
+  }
+});
+
+app.post("/api/customer-credit-terms", requireAuth, requireRole(['admin']), async (req, res) => {
+  try {
+    const authenticatedReq = req as unknown as AuthenticatedRequest;
+    const termsData = {
+      ...req.body,
+      createdBy: authenticatedReq.user?.username || 'system'
+    };
+    
+    const terms = await storage.createCustomerCreditTerms(termsData);
+    res.status(201).json(terms);
+  } catch (error) {
+    console.error("Error creating customer credit terms:", error);
+    res.status(500).json({ 
+      message: error instanceof Error ? error.message : "Error al crear términos de crédito" 
+    });
+  }
+});
+
+app.put("/api/customer-credit-terms/:id", requireAuth, requireRole(['admin']), async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const terms = await storage.updateCustomerCreditTerms(id, req.body);
+    res.json(terms);
+  } catch (error) {
+    console.error("Error updating customer credit terms:", error);
+    res.status(500).json({ message: "Error al actualizar términos de crédito" });
+  }
+});
+
+app.delete("/api/customer-credit-terms/:id", requireAuth, requireRole(['admin']), async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    await storage.deleteCustomerCreditTerms(id);
+    res.status(204).send();
+  } catch (error) {
+    console.error("Error deleting customer credit terms:", error);
+    res.status(500).json({ message: "Error al eliminar términos de crédito" });
+  }
+});
+
+// Ruta para crear venta a crédito
+app.post("/api/sales/credit", requireAuth, requireRole(['admin', 'sales']), async (req, res) => {
+  try {
+    const authenticatedReq = req as unknown as AuthenticatedRequest;
+    const saleData = {
+      ...req.body,
+      createdBy: authenticatedReq.user?.username || 'system'
+    };
+    
+    const creditInvoice = await storage.createCreditInvoice(saleData, saleData.creditTerms);
+    res.status(201).json(creditInvoice);
+  } catch (error) {
+    console.error("Error creating credit sale:", error);
+    res.status(500).json({ 
+      message: error instanceof Error ? error.message : "Error al crear venta a crédito" 
+    });
+  }
+});
+
+// Ruta para obtener balance del cliente
+app.get("/api/customers/:customerId/balance", requireAuth, async (req, res) => {
+  try {
+    const customerId = req.params.customerId;
+    const balance = await storage.getCustomerTotalBalance(customerId);
+    res.json({ balance });
+  } catch (error) {
+    console.error("Error fetching customer balance:", error);
+    res.status(500).json({ message: "Error al obtener balance del cliente" });
+  }
+});
+
+// Rutas para alertas y notificaciones
+app.get("/api/accounts-receivable/alerts", requireAuth, async (req, res) => {
+  try {
+    const alerts = await storage.getAccountsReceivableAlerts();
+    res.json(alerts);
+  } catch (error) {
+    console.error("Error fetching AR alerts:", error);
+    res.status(500).json({ message: "Error al obtener alertas" });
+  }
+});
+
+app.put("/api/accounts-receivable/alerts/:id/read", requireAuth, async (req, res) => {
+  try {
+    const alertId = parseInt(req.params.id);
+    await storage.markAlertAsRead(alertId);
+    res.json({ message: "Alerta marcada como leída" });
+  } catch (error) {
+    console.error("Error marking alert as read:", error);
+    res.status(500).json({ message: "Error al marcar alerta como leída" });
+  }
+});
+
+// Ruta para ejecutar actualización manual
+app.post("/api/accounts-receivable/manual-update", requireAuth, requireRole(['admin']), async (req, res) => {
+  try {
+    const result = await storage.runDailyAccountsReceivableUpdate();
+    res.json({
+      message: "Actualización ejecutada correctamente",
+      result
+    });
+  } catch (error) {
+    console.error("Error in manual update:", error);
+    res.status(500).json({ message: "Error en actualización manual" });
+  }
+});
+
+// Reportes adicionales
+app.get("/api/reports/accounts-receivable/summary", requireAuth, async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+    const summary = await storage.getAccountsReceivableSummary(
+      startDate ? new Date(startDate as string) : undefined,
+      endDate ? new Date(endDate as string) : undefined
+    );
+    res.json(summary);
+  } catch (error) {
+    console.error("Error generating AR summary:", error);
+    res.status(500).json({ message: "Error al generar resumen" });
+  }
+});
+
+app.get("/api/reports/accounts-receivable/by-customer", requireAuth, async (req, res) => {
+  try {
+    const report = await storage.getAccountsReceivableByCustomer();
+    res.json(report);
+  } catch (error) {
+    console.error("Error generating customer AR report:", error);
+    res.status(500).json({ message: "Error al generar reporte por cliente" });
+  }
+});
 
 
 

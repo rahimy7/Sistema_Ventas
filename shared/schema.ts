@@ -160,10 +160,13 @@ export const payrollRecords = pgTable("payroll_records", {
 export const invoices = pgTable("invoices", {
   id: serial("id").primaryKey(),
   invoiceNumber: varchar("invoice_number", { length: 50 }).notNull().unique(),
-  clientName: text("client_name").notNull(),
-  clientEmail: varchar("client_email", { length: 255 }),
-  clientPhone: varchar("client_phone", { length: 20 }),
-  clientAddress: text("client_address"),
+  // Campos de cliente corregidos
+  customerId: varchar("customer_id", { length: 100 }), // Nuevo campo agregado
+  customerName: text("customer_name"), // Renombrado de clientName
+  customerEmail: varchar("customer_email", { length: 255 }), // Renombrado de clientEmail
+  customerPhone: varchar("customer_phone", { length: 20 }), // Renombrado de clientPhone
+  customerAddress: text("customer_address"), // Renombrado de clientAddress
+  
   issueDate: timestamp("issue_date").notNull(),
   dueDate: timestamp("due_date"),
   subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull(),
@@ -173,16 +176,19 @@ export const invoices = pgTable("invoices", {
   discountAmount: decimal("discount_amount", { precision: 10, scale: 2 }).default("0"),
   total: decimal("total", { precision: 10, scale: 2 }).notNull(),
   status: varchar("status", { length: 20 }).notNull().default("pending"),
-  notes: text("notes"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-   creditTerms: integer("credit_terms").default(30), // Días de crédito
+  
+  // Campos para cuentas por cobrar
+  saleType: varchar("sale_type", { length: 20 }).default("cash"), // 'cash' | 'credit'
   paymentStatus: paymentStatusEnum("payment_status").notNull().default("pending"),
   balanceDue: decimal("balance_due", { precision: 10, scale: 2 }).notNull(),
   paidAmount: decimal("paid_amount", { precision: 10, scale: 2 }).default("0"),
   lastPaymentDate: timestamp("last_payment_date"),
+  creditTerms: integer("credit_terms").default(30), // Días de crédito
+  
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
-
 // Invoice Items
 export const invoiceItems = pgTable("invoice_items", {
   id: serial("id").primaryKey(),
@@ -210,6 +216,8 @@ export const stockMovements = pgTable("stock_movements", {
 });
 
 // Sales table
+// En shared/schema.ts - Agregar campos faltantes a la tabla sales
+
 export const sales = pgTable("sales", {
   id: serial("id").primaryKey(),
   saleNumber: varchar("sale_number", { length: 50 }).notNull().unique(),
@@ -225,6 +233,12 @@ export const sales = pgTable("sales", {
   total: decimal("total", { precision: 10, scale: 2 }).notNull(),
   paymentMethod: varchar("payment_method", { length: 50 }).notNull(),
   status: varchar("status", { length: 20 }).notNull().default("completed"),
+  
+  // Nuevos campos para ventas a crédito
+  paymentStatus: paymentStatusEnum("payment_status").default("paid"), // Para ventas a crédito
+  balanceDue: decimal("balance_due", { precision: 10, scale: 2 }).default("0"),
+  dueDate: timestamp("due_date"), // Solo para crédito
+  
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -271,6 +285,43 @@ export const suppliers = pgTable("suppliers", {
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
+
+export const customerCreditTerms = pgTable("customer_credit_terms", {
+  id: serial("id").primaryKey(),
+  customerId: varchar("customer_id", { length: 100 }).notNull().unique(),
+  customerName: varchar("customer_name", { length: 255 }).notNull(),
+  creditLimit: decimal("credit_limit", { precision: 10, scale: 2 }).notNull(),
+  paymentTermsDays: integer("payment_terms_days").notNull().default(30),
+  interestRate: decimal("interest_rate", { precision: 5, scale: 2 }).default("0"),
+  isActive: boolean("is_active").default(true),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at"),
+  createdBy: text("created_by").notNull(),
+});
+
+export const accountsReceivableAlerts = pgTable("ar_alerts", {
+  id: serial("id").primaryKey(),
+  invoiceId: integer("invoice_id").references(() => invoices.id, { onDelete: "cascade" }).notNull(),
+  alertType: varchar("alert_type", { length: 50 }).notNull(), // 'due_soon', 'overdue', 'payment_received'
+  message: text("message").notNull(),
+  isRead: boolean("is_read").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  readAt: timestamp("read_at"),
+});
+
+// Relaciones
+export const customerCreditTermsRelations = relations(customerCreditTerms, ({ many }) => ({
+  invoices: many(invoices),
+}));
+
+export const alertsRelations = relations(accountsReceivableAlerts, ({ one }) => ({
+  invoice: one(invoices, {
+    fields: [accountsReceivableAlerts.invoiceId],
+    references: [invoices.id],
+  }),
+}));
+
 
 
 export const purchasesRelations = relations(purchases, ({ one, many }) => ({
@@ -545,6 +596,15 @@ export type PurchaseItem = typeof purchaseItems.$inferSelect;
 export type InsertPurchaseItem = z.infer<typeof insertPurchaseItemSchema>;
 
 
+export type InsertCustomerCreditTerms = typeof customerCreditTerms.$inferInsert;
+export type AccountsReceivableAlert = typeof accountsReceivableAlerts.$inferSelect;
+export type InsertAlert = typeof accountsReceivableAlerts.$inferInsert;
+// En shared/schema.ts, modifica el tipo CustomerCreditTerms:
+export type CustomerCreditTerms = typeof customerCreditTerms.$inferSelect & {
+  currentBalance?: number; // Campo calculado
+};
+
+
 
 // Extended types with relations
 export type SupplierWithStats = Supplier & {
@@ -765,4 +825,36 @@ export const createPaymentSchema = z.object({
 });
 
 export type CreatePaymentData = z.infer<typeof createPaymentSchema>;
+
+export const insertCustomerCreditTermsSchema = createInsertSchema(customerCreditTerms).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const createCreditInvoiceSchema = z.object({
+  customerId: z.string().min(1),
+  customerName: z.string().min(1),
+  customerEmail: z.string().email().optional(),
+  customerPhone: z.string().optional(),
+  items: z.array(z.object({
+    productId: z.number(),
+    productName: z.string(),
+    quantity: z.number().positive(),
+    unitPrice: z.number().positive(),
+    subtotal: z.number().positive(),
+  })),
+  subtotal: z.number().positive(),
+  tax: z.number().min(0).default(0),
+  discount: z.number().min(0).default(0),
+  total: z.number().positive(),
+  creditTerms: z.object({
+    daysToPayment: z.number().positive().default(30),
+    creditLimit: z.number().positive().optional(),
+    interestRate: z.number().min(0).default(0),
+  }),
+  notes: z.string().optional(),
+});
+
+export type CreateCreditInvoiceData = z.infer<typeof createCreditInvoiceSchema>;
 

@@ -61,10 +61,16 @@ import {
   InsertInvoicePayment,
   InvoicePayment,
   invoicePayments,
-  InvoiceWithPayments
+  InvoiceWithPayments,
+  AccountsReceivableAlert,
+  accountsReceivableAlerts,
+  CustomerCreditTerms,
+  customerCreditTerms,
+  InsertAlert,
+  InsertCustomerCreditTerms
 } from "../shared/schema.js";
 import { db } from "./db.js";
-import { eq, desc, sum, count, gte, lte, and, like, inArray, gt, lt } from "drizzle-orm";
+import { eq, desc, sum, count, gte, lte, and, like, inArray, gt, lt, sql, avg, max, min } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 
 export interface IStorage {
@@ -1422,27 +1428,6 @@ async toggleSupplierStatus(id: number): Promise<Supplier> {
       ));
   }
 
-async getAccountsReceivable(): Promise<InvoiceWithPayments[]> {
-  const allInvoices = await db.select().from(invoices).orderBy(desc(invoices.issueDate));
-  
-  const invoicesWithPayments: InvoiceWithPayments[] = [];
-  
-  for (const invoice of allInvoices) {
-    const payments = await db
-      .select()
-      .from(invoicePayments)
-      .where(eq(invoicePayments.invoiceId, invoice.id));
-
-    const items = await db
-      .select()
-      .from(invoiceItems)
-      .where(eq(invoiceItems.invoiceId, invoice.id));
-
-    invoicesWithPayments.push({ ...invoice, payments, items });
-  }
-
-  return invoicesWithPayments;
-}
 
 // Obtener facturas pendientes de pago
 async getPendingInvoices(): Promise<Invoice[]> {
@@ -1491,7 +1476,19 @@ async getInvoiceWithPayments(invoiceId: number): Promise<InvoiceWithPayments | n
   return { ...invoice, payments, items };
 }
 
-// Registrar pago de factura
+// Obtener historial de pagos de una factura
+async getInvoicePayments(invoiceId: number): Promise<InvoicePayment[]> {
+  return await db
+    .select()
+    .from(invoicePayments)
+    .where(eq(invoicePayments.invoiceId, invoiceId))
+    .orderBy(desc(invoicePayments.paymentDate));
+}
+
+
+// Métodos mejorados para storage.ts
+
+// Registrar pago de factura con actualización automática de estado
 async createInvoicePayment(paymentData: InsertInvoicePayment): Promise<InvoicePayment> {
   return await db.transaction(async (tx) => {
     // Validar que la factura existe
@@ -1518,22 +1515,253 @@ async createInvoicePayment(paymentData: InsertInvoicePayment): Promise<InvoicePa
       .values(paymentData)
       .returning();
 
+    // Calcular nuevo balance
+    const newBalance = currentBalance - paymentAmount;
+    
+    // Determinar nuevo estado
+    let newStatus: 'pending' | 'partial' | 'paid' | 'overdue';
+    if (newBalance === 0) {
+      newStatus = 'paid';
+    } else if (newBalance < Number(invoice.total)) {
+      newStatus = 'partial';
+    } else {
+      // Mantener estado actual si no es un pago completo
+      const today = new Date();
+      const dueDate = new Date(invoice.dueDate!);
+      newStatus = today > dueDate ? 'overdue' : 'pending';
+    }
+
+    // Actualizar factura
+    await tx
+      .update(invoices)
+      .set({
+        balanceDue: newBalance.toString(),
+        paymentStatus: newStatus,
+        updatedAt: new Date()
+      })
+      .where(eq(invoices.id, paymentData.invoiceId));
+
     return payment;
   });
 }
 
-// Obtener historial de pagos de una factura
-async getInvoicePayments(invoiceId: number): Promise<InvoicePayment[]> {
-  return await db
-    .select()
-    .from(invoicePayments)
-    .where(eq(invoicePayments.invoiceId, invoiceId))
-    .orderBy(desc(invoicePayments.paymentDate));
+// Actualizar estados de facturas vencidas
+async updateOverdueInvoices(): Promise<number> {
+  const today = new Date();
+  
+  const result = await db
+    .update(invoices)
+    .set({
+      paymentStatus: 'overdue',
+      updatedAt: new Date()
+    })
+    .where(
+      and(
+        lt(invoices.dueDate, today),
+        inArray(invoices.paymentStatus, ['pending', 'partial']),
+        gt(invoices.balanceDue, "0")
+      )
+    )
+    .returning({ id: invoices.id });
+
+  return result.length;
 }
 
-// Eliminar pago
+// Actualizar estado de pago de una factura específica
+async updateInvoicePaymentStatus(invoiceId: number): Promise<void> {
+  await db.transaction(async (tx) => {
+    // Obtener factura actual
+    const [invoice] = await tx
+      .select()
+      .from(invoices)
+      .where(eq(invoices.id, invoiceId));
+
+    if (!invoice) {
+      throw new Error("Factura no encontrada");
+    }
+
+    // Calcular total pagado
+    const paymentsResult = await tx
+      .select({
+        totalPaid: sum(invoicePayments.paymentAmount)
+      })
+      .from(invoicePayments)
+      .where(eq(invoicePayments.invoiceId, invoiceId));
+
+    const totalPaid = Number(paymentsResult[0]?.totalPaid || 0);
+    const invoiceTotal = Number(invoice.total);
+    const newBalance = invoiceTotal - totalPaid;
+
+    // Determinar nuevo estado
+    let newStatus: 'pending' | 'partial' | 'paid' | 'overdue';
+    if (newBalance <= 0) {
+      newStatus = 'paid';
+    } else if (totalPaid > 0) {
+      newStatus = 'partial';
+    } else {
+      const today = new Date();
+      const dueDate = new Date(invoice.dueDate!);
+      newStatus = today > dueDate ? 'overdue' : 'pending';
+    }
+
+    // Actualizar factura
+    await tx
+      .update(invoices)
+      .set({
+        balanceDue: Math.max(0, newBalance).toString(),
+        paymentStatus: newStatus,
+        updatedAt: new Date()
+      })
+      .where(eq(invoices.id, invoiceId));
+  });
+}
+
+// Eliminar pago con actualización de estado
 async deleteInvoicePayment(paymentId: number): Promise<void> {
-  await db.delete(invoicePayments).where(eq(invoicePayments.id, paymentId));
+  await db.transaction(async (tx) => {
+    // Obtener información del pago
+    const [payment] = await tx
+      .select()
+      .from(invoicePayments)
+      .where(eq(invoicePayments.id, paymentId));
+
+    if (!payment) {
+      throw new Error("Pago no encontrado");
+    }
+
+    // Eliminar el pago
+    await tx
+      .delete(invoicePayments)
+      .where(eq(invoicePayments.id, paymentId));
+
+    // Actualizar estado de la factura
+    await this.updateInvoicePaymentStatus(payment.invoiceId);
+  });
+}
+
+// Crear factura a crédito (integración con ventas)
+async createCreditInvoice(saleData: any, creditTerms: {
+  daysToPayment: number;
+  creditLimit?: number;
+  interestRate?: number;
+}): Promise<Invoice> {
+  return await db.transaction(async (tx) => {
+    // Validar límite de crédito si aplica
+    if (creditTerms.creditLimit) {
+      const customerBalance = await this.getCustomerTotalBalance(saleData.customerId);
+      if (customerBalance + Number(saleData.total) > creditTerms.creditLimit) {
+        throw new Error("Límite de crédito excedido");
+      }
+    }
+
+    // Calcular fecha de vencimiento
+    const dueDate = new Date();
+    dueDate.setDate(dueDate.getDate() + creditTerms.daysToPayment);
+
+    // Crear factura
+    const [invoice] = await tx
+      .insert(invoices)
+      .values({
+        ...saleData,
+        saleType: 'credit',
+        paymentStatus: 'pending',
+        dueDate: dueDate,
+        balanceDue: saleData.total,
+        creditTerms: JSON.stringify(creditTerms),
+        createdAt: new Date(),
+        updatedAt: new Date()
+      })
+      .returning();
+
+    return invoice;
+  });
+}
+
+// Obtener balance total de un cliente
+async getCustomerTotalBalance(customerId: string): Promise<number> {
+  const result = await db
+    .select({
+      totalBalance: sum(invoices.balanceDue)
+    })
+    .from(invoices)
+    .where(
+      and(
+        eq(invoices.customerId, customerId),
+        inArray(invoices.paymentStatus, ['pending', 'partial', 'overdue']),
+        gt(invoices.balanceDue, "0")
+      )
+    );
+
+  return Number(result[0]?.totalBalance || 0);
+}
+
+// Obtener facturas próximas a vencer (para notificaciones)
+async getUpcomingDueInvoices(daysAhead: number = 7): Promise<Invoice[]> {
+  const today = new Date();
+  const futureDate = new Date();
+  futureDate.setDate(today.getDate() + daysAhead);
+
+  return await db
+    .select()
+    .from(invoices)
+    .where(
+      and(
+        gte(invoices.dueDate, today),
+        lte(invoices.dueDate, futureDate),
+        inArray(invoices.paymentStatus, ['pending', 'partial']),
+        gt(invoices.balanceDue, "0")
+      )
+    )
+    .orderBy(invoices.dueDate);
+}
+
+// Obtener todas las cuentas por cobrar con información detallada
+async getAccountsReceivable(): Promise<any[]> {
+  return await db
+    .select({
+      id: invoices.id,
+      invoiceNumber: invoices.invoiceNumber,
+      customerId: invoices.customerId,
+      customerName: invoices.customerName,
+      total: invoices.total,
+      balanceDue: invoices.balanceDue,
+      paymentStatus: invoices.paymentStatus,
+      dueDate: invoices.dueDate,
+      createdAt: invoices.createdAt,
+      daysOverdue: sql<number>`CASE 
+        WHEN ${invoices.dueDate} < CURRENT_DATE 
+        THEN EXTRACT(DAY FROM CURRENT_DATE - ${invoices.dueDate})
+        ELSE 0 
+      END`
+    })
+    .from(invoices)
+    .where(
+      and(
+        inArray(invoices.paymentStatus, ['pending', 'partial', 'overdue']),
+        gt(invoices.balanceDue, "0")
+      )
+    )
+    .orderBy(desc(invoices.dueDate));
+}
+
+// Job automático para actualizar estados (llamar desde un cron job)
+async runDailyAccountsReceivableUpdate(): Promise<{
+  overdueUpdated: number;
+  notificationsSent: number;
+}> {
+  // Actualizar facturas vencidas
+  const overdueCount = await this.updateOverdueInvoices();
+  
+  // Obtener facturas próximas a vencer para notificaciones
+  const upcomingDue = await this.getUpcomingDueInvoices(3); // 3 días antes
+  
+  // Aquí podrías integrar un sistema de notificaciones
+  // Por ejemplo, enviar emails o crear alertas en el sistema
+  
+  return {
+    overdueUpdated: overdueCount,
+    notificationsSent: upcomingDue.length
+  };
 }
 
 // Estadísticas de cuentas por cobrar
@@ -1637,6 +1865,149 @@ async getAgingReport(): Promise<{
   });
 
   return aging;
+}
+
+async getAllCustomerCreditTerms(): Promise<CustomerCreditTerms[]> {
+  const terms = await db
+    .select()
+    .from(customerCreditTerms)
+    .orderBy(customerCreditTerms.customerName);
+
+  // Obtener balance actual de cada cliente
+  const termsWithBalance = await Promise.all(
+    terms.map(async (term) => {
+      const balance = await this.getCustomerTotalBalance(term.customerId);
+      return { ...term, currentBalance: balance };
+    })
+  );
+
+  return termsWithBalance;
+}
+
+async getCustomerCreditTerms(customerId: string): Promise<CustomerCreditTerms | null> {
+  const [terms] = await db
+    .select()
+    .from(customerCreditTerms)
+    .where(eq(customerCreditTerms.customerId, customerId));
+
+  if (!terms) return null;
+
+  const balance = await this.getCustomerTotalBalance(customerId);
+  return { ...terms, currentBalance: balance };
+}
+
+async createCustomerCreditTerms(data: InsertCustomerCreditTerms): Promise<CustomerCreditTerms> {
+  const [terms] = await db
+    .insert(customerCreditTerms)
+    .values({
+      ...data,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    })
+    .returning();
+
+  return terms;
+}
+
+async updateCustomerCreditTerms(id: number, data: Partial<CustomerCreditTerms>): Promise<CustomerCreditTerms> {
+  const [terms] = await db
+    .update(customerCreditTerms)
+    .set({
+      ...data,
+      updatedAt: new Date()
+    })
+    .where(eq(customerCreditTerms.id, id))
+    .returning();
+
+  return terms;
+}
+
+async deleteCustomerCreditTerms(id: number): Promise<void> {
+  await db
+    .delete(customerCreditTerms)
+    .where(eq(customerCreditTerms.id, id));
+}
+
+async createAlert(data: InsertAlert): Promise<AccountsReceivableAlert> {
+  const [alert] = await db
+    .insert(accountsReceivableAlerts)
+    .values({
+      ...data,
+      createdAt: new Date()
+    })
+    .returning();
+
+  return alert;
+}
+
+async getAccountsReceivableAlerts(): Promise<AccountsReceivableAlert[]> {
+  return await db
+    .select()
+    .from(accountsReceivableAlerts)
+    .where(eq(accountsReceivableAlerts.isRead, false))
+    .orderBy(desc(accountsReceivableAlerts.createdAt))
+    .limit(50);
+}
+
+async markAlertAsRead(alertId: number): Promise<void> {
+  await db
+    .update(accountsReceivableAlerts)
+    .set({
+      isRead: true,
+      readAt: new Date()
+    })
+    .where(eq(accountsReceivableAlerts.id, alertId));
+}
+
+async getAccountsReceivableSummary(startDate?: Date, endDate?: Date): Promise<any> {
+  const dateFilter = startDate && endDate 
+    ? and(
+        gte(invoices.createdAt, startDate),
+        lte(invoices.createdAt, endDate)
+      )
+    : undefined;
+
+  const summary = await db
+    .select({
+      totalInvoices: count(),
+      totalAmount: sum(invoices.total),
+      totalPaid: sum(sql`CASE WHEN ${invoices.paymentStatus} = 'paid' THEN ${invoices.total} ELSE 0 END`),
+      totalPending: sum(sql`CASE WHEN ${invoices.paymentStatus} IN ('pending', 'partial', 'overdue') THEN ${invoices.balanceDue} ELSE 0 END`),
+      avgDaysToPayment: avg(sql`EXTRACT(DAY FROM ${invoices.updatedAt} - ${invoices.createdAt})`),
+    })
+    .from(invoices)
+    .where(
+      and(
+        eq(invoices.saleType, 'credit'),
+        dateFilter
+      )
+    );
+
+  return summary[0];
+}
+
+async getAccountsReceivableByCustomer(): Promise<any[]> {
+  return await db
+    .select({
+      customerId: invoices.customerId,
+      customerName: invoices.customerName,
+      totalInvoices: count(),
+      totalAmount: sum(invoices.total),
+      totalPending: sum(invoices.balanceDue),
+      oldestInvoice: min(invoices.createdAt),
+      lastPayment: max(invoicePayments.paymentDate)
+    })
+    .from(invoices)
+    .leftJoin(invoicePayments, eq(invoices.id, invoicePayments.invoiceId))
+    .where(
+      and(
+        eq(invoices.saleType, 'credit'),
+        inArray(invoices.paymentStatus, ['pending', 'partial', 'overdue']),
+        gt(invoices.balanceDue, "0")
+      )
+    )
+    .groupBy(invoices.customerId, invoices.customerName)
+    .orderBy(desc(sql`sum(${invoices.balanceDue})`));
 }
 
 // Marcar facturas vencidas (ejecutar diariamente)

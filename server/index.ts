@@ -6,6 +6,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes.js";
 import path from "path";
 import { ExpiredQuotesJob } from './jobs/expired-quotes-job';
+import { initializeCronJobs } from './cron-jobs';
 
 console.log("🔧 Environment check:");
 console.log("NODE_ENV:", process.env.NODE_ENV);
@@ -116,6 +117,7 @@ app.post('/api/admin/check-expired-quotes', async (req, res) => {
       console.log(`🚀 Server running on ${host}:${port}`);
       console.log(`🔍 Health check: http://${host}:${port}/api/health`);
       console.log(`📋 Job de cotizaciones expiradas iniciado`);
+      initializeCronJobs();
     });
 
     console.log("✅ Routes registered successfully");
@@ -138,6 +140,9 @@ process.on('SIGINT', () => {
   expiredQuotesJob.stop();
   process.exit(0);
 });
+
+
+
 
 // Use ESM exports consistently
 export default app;

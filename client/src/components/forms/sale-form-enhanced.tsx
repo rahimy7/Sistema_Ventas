@@ -16,7 +16,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { downloadInvoicePDF } from "@/components/invoice/invoice-pdf";
 import { insertSaleSchema, type InsertSale, type InventoryItem, type CompanySettings, type Sale, type SaleItem } from "@shared/schema";
 import SaleInvoiceDialog from "@/components/invoice/sale-invoice-dialog";
-import { Plus, Trash2, ShoppingCart, User, CreditCard, Package, Calculator, Search, Check, Printer, FileText } from "lucide-react";
+import { Plus, Trash2, ShoppingCart, User, CreditCard, Package, Calculator, Search, Check, Printer, FileText, DollarSign } from "lucide-react";
 import { z } from "zod";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
@@ -47,6 +47,9 @@ export default function SaleFormEnhanced({ onSuccess }: SaleFormProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
   const [completedSale, setCompletedSale] = useState<Sale | null>(null);
+  const [saleType, setSaleType] = useState<'cash' | 'credit'>('cash');
+const [customerCreditInfo, setCustomerCreditInfo] = useState<any>(null);
+const [creditTerms, setCreditTerms] = useState({ daysToPayment: 30, interestRate: 0 });
 
   const form = useForm<SaleFormData>({
     resolver: zodResolver(saleFormSchema),
@@ -126,7 +129,7 @@ export default function SaleFormEnhanced({ onSuccess }: SaleFormProps) {
       // Crear sale data desde formulario
       const formData = form.getValues();
            
-      const saleData: Sale = {
+    const saleData: Sale = {
   id: sale?.id || Date.now(),
   saleNumber: `V${Date.now()}`,
   customerName: formData.customerName,
@@ -142,6 +145,10 @@ export default function SaleFormEnhanced({ onSuccess }: SaleFormProps) {
   paymentMethod: formData.paymentMethod || "",
   status: formData.status || "completed",
   notes: formData.notes || null,
+  // Campos faltantes:
+  paymentStatus: "paid",
+  balanceDue: "0",
+  dueDate: null,
   createdAt: new Date(),
   updatedAt: new Date()
 };
@@ -334,7 +341,65 @@ export default function SaleFormEnhanced({ onSuccess }: SaleFormProps) {
               />
             </CardContent>
           </Card>
+{/* Tipo de Venta */}
+<Card>
+  <CardHeader>
+    <CardTitle className="text-lg">Tipo de Venta</CardTitle>
+  </CardHeader>
+  <CardContent>
+    <div className="space-y-4">
+      <div className="flex gap-4">
+        <label className="flex items-center gap-2">
+          <input 
+            type="radio" 
+            name="saleType" 
+            value="cash" 
+            checked={saleType === 'cash'}
+            onChange={(e) => setSaleType(e.target.value as 'cash' | 'credit')}
+          />
+          <DollarSign className="h-4 w-4 text-green-600" />
+          Contado
+        </label>
+        <label className="flex items-center gap-2">
+          <input 
+            type="radio" 
+            name="saleType" 
+            value="credit" 
+            checked={saleType === 'credit'}
+            onChange={(e) => setSaleType(e.target.value as 'cash' | 'credit')}
+          />
+          <CreditCard className="h-4 w-4 text-blue-600" />
+          Crédito
+        </label>
+      </div>
 
+      {saleType === 'credit' && (
+        <div className="bg-blue-50 p-4 rounded-lg border">
+          <div className="text-sm text-blue-700 mb-2">Términos de Crédito</div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>Días para pago</Label>
+              <Input 
+                type="number" 
+                value={creditTerms.daysToPayment}
+                onChange={(e) => setCreditTerms(prev => ({...prev, daysToPayment: parseInt(e.target.value) || 30}))}
+              />
+            </div>
+            <div>
+              <Label>Tasa interés (%)</Label>
+              <Input 
+                type="number" 
+                step="0.1"
+                value={creditTerms.interestRate}
+                onChange={(e) => setCreditTerms(prev => ({...prev, interestRate: parseFloat(e.target.value) || 0}))}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  </CardContent>
+</Card>
           {/* Products Section */}
           <Card>
             <CardHeader>

@@ -174,14 +174,14 @@ export default function ReportsPage() {
     return months;
   }, [sales, expenses, purchases, incomes, selectedMonth]);
 
-  const handleDownloadReport = () => {
-    generateMonthlyReportPDF({
-      month: format(selectedMonth, "MMMM yyyy", { locale: es }),
-      stats: monthlyStats,
-      chartData: historicalData,
-      monthlyData,
-    });
-  };
+ const handleDownloadReport = () => {
+  generateMonthlyReportPDF({
+    month: format(selectedMonth, "MMMM yyyy", { locale: es }),
+    stats: monthlyStats,
+    chartData: historicalData,
+    monthlyData,
+  } as any);
+};
 
   const goToPreviousMonth = () => {
     setSelectedMonth(prev => subMonths(prev, 1));
